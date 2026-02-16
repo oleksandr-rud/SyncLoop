@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "syncloop": {
+      "command": "node",
+      "args": ["bin/cli.js"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
