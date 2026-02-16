@@ -1,5 +1,8 @@
 Initialize and wire the SyncLoop reasoning protocol to the current repository.
 
+If SyncLoop target platform is not explicitly provided yet, ask the user first:
+"Which SyncLoop target platform should I scaffold: `copilot`, `cursor`, `claude`, or `all`?"
+
 Requirements:
 
 1) Scan the full codebase to understand:

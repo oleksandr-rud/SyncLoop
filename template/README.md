@@ -40,6 +40,9 @@ If you want the protocol files in your project (for offline use, customization, 
 
 Ask: "Use the syncloop init tool to scaffold files for [copilot/cursor/claude/all] into this project"
 
+Before calling `init`, the agent should ask:
+"Which SyncLoop target platform should I scaffold: `copilot`, `cursor`, `claude`, or `all`?"
+
 ### Manual Copy
 
 1. Copy `.agent-loop/` into your project root

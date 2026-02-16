@@ -97,6 +97,9 @@ If you also want the protocol files in your project (for offline use or customiz
 Use the syncloop init tool to scaffold files for copilot/cursor/claude/all
 ```
 
+When an AI agent performs this step, it should ask first:
+"Which SyncLoop target platform should I scaffold: `copilot`, `cursor`, `claude`, or `all`?"
+
 This creates:
 
 | Target | Files generated |

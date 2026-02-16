@@ -126,11 +126,11 @@ const StackSchema = z.object({
 
 server.tool(
   "init",
-  "Scaffold SyncLoop protocol files into a project. The agent MUST scan the codebase first to detect all stacks (frontend, backend, services, etc.) and pass them as the stacks array. After scaffolding, the agent MUST scan again and update the generated files with actual project data.",
+  "Scaffold SyncLoop protocol files into a project. Before calling this tool, the agent MUST ask the user to confirm the SyncLoop target platform (`copilot`, `cursor`, `claude`, or `all`) unless the user already explicitly provided it. Then scan the codebase to detect all stacks (frontend, backend, services, etc.) and pass them as the stacks array. After scaffolding, the agent MUST scan again and update the generated files with actual project data.",
   {
     projectPath: z.string().describe("Absolute path to the project root directory"),
     target: z.enum(["copilot", "cursor", "claude", "all"]).describe(
-      "Target platform: copilot (.github/instructions/), cursor (.cursor/rules/), claude (.claude/rules/ + CLAUDE.md), or all",
+      "SyncLoop target platform (must be user-confirmed before tool call): copilot (.github/instructions/), cursor (.cursor/rules/), claude (.claude/rules/ + CLAUDE.md), or all",
     ),
     stacks: z.array(StackSchema).min(1).describe(
       "Project stacks — one entry per layer/service. Fullstack app: [{name:'backend',...},{name:'frontend',...}]. Monolith: [{name:'app',...}]. Microservices: one per service.",
