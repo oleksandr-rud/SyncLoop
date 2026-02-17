@@ -51,4 +51,17 @@ SENSE → GKP → DECIDE+ACT → CHALLENGE-TEST → UPDATE → LEARN → REPORT
 - ❌ Never change public API without approval
 - ❌ Never bypass architecture layers
 
+### MCP Configuration
+
+```json
+{
+  "mcpServers": {
+    "sync_loop": {
+      "command": "npx",
+      "args": ["-y", "-p", "@oleksandr.rudnychenko/sync_loop", "sync_loop"]
+    }
+  }
+}
+```
+
 Full protocol details available via SyncLoop MCP resources or in `.github/instructions/` directory.

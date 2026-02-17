@@ -23,23 +23,21 @@ Referenced from [reasoning-kernel.md](reasoning-kernel.instructions.md).
 ## Architecture Baseline
 
 ```
-Routes → Services → Repositories → Libs
+CLI Transport (bin/) ─┬► Init Logic (src/init.js) ► Templates (template/)
+MCP Transport (src/) ─┘
 ```
 
-{Replace with actual project layers during bootstrap.}
-
 ### Layer Intent
-- **Routes**: Transport/boundary only. No business logic.
-- **Services**: Business orchestration. Domain logic lives here.
-- **Repositories**: Data access contracts.
-- **Libs**: Infrastructure utilities. No imports from app modules.
+- **`bin/cli.js`**: Argument parsing and output formatting only. Delegates all scaffolding to `src/init.js`.
+- **`src/server.js`**: MCP resource/tool/prompt registration only. Delegates all scaffolding to `src/init.js`.
+- **`src/init.js`**: All core logic — stack detection, link rewriting, placeholder substitution, file generation. No transport concerns.
+- **`template/`**: Read-only static assets. Never import from `src/`.
 
 ### Non-Bypass Rules
-- Never import across incompatible layers
-- Never bypass the service layer from transport handlers
+- Never implement scaffolding logic in `bin/cli.js` or `src/server.js` — delegate to `src/init.js`
+- Never change `init()` or `detectStacks()` signatures without updating both callers
 - Never change public APIs without explicit approval
-
-{Add project-specific non-bypass rules here.}
+- Never rename `sync_loop` (package/binary) in one place — update all references atomically
 
 ---
 
@@ -162,24 +160,20 @@ Documentation and contract requirements for boundary endpoints: typed models, do
 ### Application Code
 
 | Artifact Type | Location |
-|---------------|----------|
-| Domain models | `{modules}/{domain}/models.*` |
-| Business services | `{modules}/{domain}/services.*` |
-| Transport routes | `{modules}/{domain}/routes.*` |
-| Infrastructure ports | `{libs}/{component}/port.*` |
-| Infrastructure adapters | `{libs}/{component}/{impl}.*` |
-| Utilities | `{libs}/utils/` |
+|---------------|-----------|
+| CLI entry point | `bin/cli.js` |
+| MCP server | `src/server.js` |
+| Core scaffolding logic | `src/init.js` |
+| Protocol template files | `template/.agent-loop/` |
+| Agent bootstrap templates | `template/AGENTS.md`, `template/protocol-summary.md`, `template/bootstrap-prompt.md` |
 
 ### Tests
 
-| Test Type | Location | Purpose |
+| Test Type | Command | Purpose |
 |-----------|----------|---------|
-| Unit | `tests/unit/test_{component}.*` | Pure logic, no I/O |
-| Integration | `tests/integration/test_{feature}.*` | Multi-component workflows |
-| API/Endpoint | `tests/api/test_{endpoint}.*` | Transport endpoint tests |
-| Fixtures | `tests/conftest.*` | Shared test fixtures |
-| Factories | `tests/factories.*` | Test data builders |
-| Mocks | `tests/mocks.*` | Mock adapters |
+| CLI smoke | `node bin/cli.js --help` | Verify CLI entry point loads |
+| Dry-run scaffold | `node bin/cli.js init --dry-run` | Verify file generation logic |
+| MCP server start | pipe `initialize` JSON to `node bin/cli.js` | Verify MCP transport connects |
 
 ### Documentation & Agent Loop
 
@@ -213,6 +207,7 @@ Documentation and contract requirements for boundary endpoints: typed models, do
 | Missing explicit return type | Signature drift | Add concrete return annotation | ✅ |
 | Stray debug artifact | Temporary local instrumentation left in patch | Remove or replace with standard logging | ✅ |
 | Caller mismatch after rename | Incomplete refactor propagation | Update all known call sites before merge | ⚠️ |
+| Stale package/binary name in docs or templates | Rename applied to code but not docs | Grep all references (`bin/`, `src/`, `template/`, `README.md`, `AGENTS.md`) and update atomically | ⚠️ |
 
 ### Common Errors
 
@@ -221,6 +216,7 @@ Documentation and contract requirements for boundary endpoints: typed models, do
 | Gate keeps failing with small patch changes | Symptoms fixed, not root cause | Patch the first cause in dependency chain |
 | Neighbor break after “safe” refactor | Consumer map incomplete | Run validate-n immediately after structural edits |
 | Quality regressions in fast fixes | No targeted test sequence | Start with narrow tests, then expand |
+| Old package name appears in published output | Rename skipped template/ or README | Always grep template/ when renaming package or binary |
 
 ### Heuristics
 
@@ -229,6 +225,7 @@ Documentation and contract requirements for boundary endpoints: typed models, do
 | Compress context into explicit constraints | Carry large raw snippets forward |
 | Validate boundaries early | Delay compatibility checks |
 | Keep patches reversible | Mix refactor and feature changes together |
+| Grep all surfaces (src, bin, template, docs) before publishing a rename | Assume code-only rename is complete |
 
 ### Pruning Records
 

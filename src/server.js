@@ -2,20 +2,55 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve, posix } from "node:path";
 import { fileURLToPath } from "node:url";
-import { init } from "./init.js";
+import { init, detectStacks } from "./init.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const TEMPLATE_DIR = join(__dirname, "..", "template");
+const TEMPLATE_DIR = join(__dirname, "template");
+const PACKAGE_JSON = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
 
 function readTemplate(relativePath) {
   return readFileSync(join(TEMPLATE_DIR, relativePath), "utf-8");
 }
 
+function pathDir(value) {
+  const dir = posix.dirname(value);
+  return dir === "." ? "" : dir;
+}
+
+function splitHash(link) {
+  const idx = link.indexOf("#");
+  if (idx === -1) return { pathPart: link, hash: "" };
+  return {
+    pathPart: link.slice(0, idx),
+    hash: link.slice(idx),
+  };
+}
+
+function isExternalLink(link) {
+  return /^([a-z]+:|#)/i.test(link);
+}
+
+function rewriteMarkdownLinks(content, transform) {
+  let inFence = false;
+  return content
+    .split("\n")
+    .map((line) => {
+      if (line.trimStart().startsWith("```")) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence) return line;
+      return line.replace(/\]\(([^)]+)\)/g, (_match, linkPath) => `](${transform(linkPath)})`);
+    })
+    .join("\n");
+}
+
 // ---------------------------------------------------------------------------
-// Doc registry — each entry maps to a template file
+// Doc registry
 // ---------------------------------------------------------------------------
+
 const DOCS = {
   "overview": {
     path: ".agent-loop/README.md",
@@ -25,7 +60,7 @@ const DOCS = {
   "agents-md": {
     path: "AGENTS.md",
     name: "AGENTS.md Template",
-    description: "Root entrypoint template for AI agents — project identity, protocol, guardrails",
+    description: "Root entrypoint template for AI agents - project identity, protocol, guardrails",
   },
   "protocol-summary": {
     path: "protocol-summary.md",
@@ -64,7 +99,7 @@ const DOCS = {
   },
   "code-patterns": {
     path: ".agent-loop/patterns/code-patterns.md",
-    name: "Code Patterns (P1–P11)",
+    name: "Code Patterns (P1-P11)",
     description: "Port/adapter, domain modules, tasks, routes, DI, config, types, error handling",
   },
   "testing-guide": {
@@ -84,28 +119,72 @@ const DOCS = {
   },
 };
 
+const DOC_ID_BY_PATH = {};
+for (const [id, doc] of Object.entries(DOCS)) {
+  DOC_ID_BY_PATH[doc.path] = id;
+}
+
+function rewriteResourceLinks(content, sourcePath) {
+  return rewriteMarkdownLinks(content, (linkPath) => {
+    if (isExternalLink(linkPath)) return linkPath;
+
+    const { pathPart, hash } = splitHash(linkPath);
+    if (!pathPart) return linkPath;
+
+    let canonical = posix.normalize(posix.join(pathDir(sourcePath) || ".", pathPart)).replace(/^\.\//, "");
+    if (canonical === ".agent-loop/patterns") canonical = ".agent-loop/patterns.md";
+    if (canonical === "../AGENTS.md" || canonical === "AGENTS.md") canonical = "AGENTS.md";
+    if (canonical === "../README.md") return linkPath;
+
+    const docId = DOC_ID_BY_PATH[canonical];
+    if (!docId) return linkPath;
+
+    return `syncloop://docs/${docId}${hash}`;
+  });
+}
+
+function formatStacks(stacks) {
+  return stacks
+    .map((stack) => [
+      `\n### ${stack.name}${stack.path ? ` (${stack.path})` : ""}`,
+      `- Languages: ${stack.languages.join(", ")}`,
+      `- Frameworks: ${stack.frameworks.join(", ")}`,
+      stack.testRunner ? `- Test runner: ${stack.testRunner}` : null,
+      stack.typeChecker ? `- Type checker: ${stack.typeChecker}` : null,
+      stack.linter ? `- Linter: ${stack.linter}` : null,
+      stack.packageManager ? `- Package manager: ${stack.packageManager}` : null,
+    ].filter(Boolean).join("\n"))
+    .join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Server
 // ---------------------------------------------------------------------------
+
 const server = new McpServer({
   name: "sync_loop",
-  version: "0.1.0",
+  version: PACKAGE_JSON.version,
 });
 
 // ---------------------------------------------------------------------------
-// Resources — each protocol doc exposed as a readable resource
+// Resources
 // ---------------------------------------------------------------------------
+
 for (const [id, doc] of Object.entries(DOCS)) {
-  server.resource(
+  server.registerResource(
     doc.name,
     `syncloop://docs/${id}`,
-    async (uri) => ({
-      contents: [{
-        uri: uri.href,
-        mimeType: "text/markdown",
-        text: readTemplate(doc.path),
-      }],
-    }),
+    async (uri) => {
+      const raw = readTemplate(doc.path);
+      const rewritten = rewriteResourceLinks(raw, doc.path);
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "text/markdown",
+          text: rewritten,
+        }],
+      };
+    },
   );
 }
 
@@ -114,48 +193,49 @@ for (const [id, doc] of Object.entries(DOCS)) {
 // ---------------------------------------------------------------------------
 
 const StackSchema = z.object({
-  name: z.string().describe("Stack/layer name (e.g. 'backend', 'frontend', 'auth-service', 'worker')"),
-  languages: z.array(z.string()).describe("Programming languages used (e.g. ['TypeScript', 'Python'])"),
-  frameworks: z.array(z.string()).describe("Frameworks used (e.g. ['Next.js', 'Tailwind'] or ['FastAPI', 'SQLAlchemy'])"),
-  testRunner: z.string().optional().describe("Test runner command (e.g. 'jest', 'pytest', 'vitest')"),
-  typeChecker: z.string().optional().describe("Type checker command (e.g. 'tsc --noEmit', 'mypy', 'pyright')"),
-  linter: z.string().optional().describe("Lint/format command (e.g. 'eslint .', 'ruff check')"),
-  packageManager: z.string().optional().describe("Package manager (e.g. 'npm', 'pnpm', 'poetry')"),
-  path: z.string().optional().describe("Root directory of this stack relative to project root (e.g. 'apps/web', 'services/auth'). Omit for monolith."),
+  name: z.string().describe("Stack/layer name (for example: backend, frontend, worker)"),
+  languages: z.array(z.string()).describe("Programming languages used by this stack"),
+  frameworks: z.array(z.string()).describe("Frameworks/libraries for this stack"),
+  testRunner: z.string().optional().describe("Test runner command"),
+  typeChecker: z.string().optional().describe("Type checker command"),
+  linter: z.string().optional().describe("Lint/format command"),
+  packageManager: z.string().optional().describe("Package manager name"),
+  path: z.string().optional().describe("Root directory of this stack relative to project root"),
 });
 
-server.tool(
+server.registerTool(
   "init",
-  "Scaffold SyncLoop protocol files into a project. Before calling this tool, the agent MUST ask the user to confirm the SyncLoop target platform (`copilot`, `cursor`, `claude`, or `all`) unless the user already explicitly provided it. Then scan the codebase to detect all stacks (frontend, backend, services, etc.) and pass them as the stacks array. After scaffolding, the agent MUST scan again and update the generated files with actual project data.",
+  "Scaffold SyncLoop protocol files into a project. If target is not explicitly provided, default to all. If stacks are not provided, auto-detect them by scanning the repository.",
   {
-    projectPath: z.string().describe("Absolute path to the project root directory"),
-    target: z.enum(["copilot", "cursor", "claude", "all"]).describe(
-      "SyncLoop target platform (must be user-confirmed before tool call): copilot (.github/instructions/), cursor (.cursor/rules/), claude (.claude/rules/ + CLAUDE.md), or all",
-    ),
-    stacks: z.array(StackSchema).min(1).describe(
-      "Project stacks — one entry per layer/service. Fullstack app: [{name:'backend',...},{name:'frontend',...}]. Monolith: [{name:'app',...}]. Microservices: one per service.",
-    ),
+    projectPath: z.string().optional().describe("Project root path. Defaults to current working directory."),
+    target: z.enum(["copilot", "cursor", "claude", "all"]).optional().default("all"),
+    stacks: z.array(StackSchema).optional().describe("Optional stack definitions. Auto-detected when omitted."),
+    dryRun: z.boolean().optional().default(false).describe("Preview file writes without modifying files."),
+    overwrite: z.boolean().optional().default(true).describe("Overwrite existing generated files."),
   },
-  async ({ projectPath, target, stacks }) => {
+  async ({ projectPath, target = "all", stacks, dryRun = false, overwrite = true }) => {
     try {
-      const results = init(projectPath, target, stacks);
+      const resolvedProjectPath = resolve(projectPath ?? process.cwd());
+      const effectiveStacks = stacks?.length ? stacks : detectStacks(resolvedProjectPath);
+      const initResult = init(
+        resolvedProjectPath,
+        target,
+        effectiveStacks,
+        { dryRun, overwrite },
+      );
       const bootstrapPrompt = readTemplate("bootstrap-prompt.md");
-
-      const stackSummary = stacks.map(s => [
-        `\n### ${s.name}${s.path ? ` (${s.path})` : ""}`,
-        `- Languages: ${s.languages.join(", ")}`,
-        `- Frameworks: ${s.frameworks.join(", ")}`,
-        s.testRunner   ? `- Test runner: ${s.testRunner}` : null,
-        s.typeChecker  ? `- Type checker: ${s.typeChecker}` : null,
-        s.linter       ? `- Linter: ${s.linter}` : null,
-        s.packageManager ? `- Package manager: ${s.packageManager}` : null,
-      ].filter(Boolean).join("\n")).join("\n");
+      const stackSummary = formatStacks(initResult.stacks);
 
       return {
         content: [
-          { type: "text", text: `SyncLoop initialized for ${target}:\n\n${results.join("\n")}` },
+          { type: "text", text: `SyncLoop initialized for ${target}:\n\n${initResult.results.join("\n")}` },
+          { type: "text", text: `\n---\n\n## Options\n- dryRun: ${dryRun}\n- overwrite: ${overwrite}` },
           { type: "text", text: `\n---\n\n## Detected stacks\n${stackSummary}` },
-          { type: "text", text: `\n---\n\n**IMPORTANT: Now scan the codebase and wire the generated SyncLoop files to this project.**\n\n${bootstrapPrompt}` },
+          {
+            type: "text",
+            text: `\n---\n\n**IMPORTANT: Now scan the codebase and wire the generated SyncLoop files to this project.**\n\n${bootstrapPrompt}`,
+          },
+          { type: "text", text: `\n---\n\n## Machine-readable result\n\`\`\`json\n${JSON.stringify(initResult, null, 2)}\n\`\`\`` },
         ],
       };
     } catch (err) {
@@ -171,9 +251,9 @@ server.tool(
 // Prompts
 // ---------------------------------------------------------------------------
 
-server.prompt(
+server.registerPrompt(
   "bootstrap",
-  "Bootstrap prompt — wire SyncLoop protocol to an existing project by scanning its codebase",
+  "Bootstrap prompt - wire SyncLoop protocol to an existing project by scanning its codebase",
   async () => ({
     description: "Scan the project codebase and wire SyncLoop protocol references to real project structure",
     messages: [{
@@ -186,9 +266,9 @@ server.prompt(
   }),
 );
 
-server.prompt(
+server.registerPrompt(
   "protocol",
-  "SyncLoop reasoning protocol summary — inject as system context for any AI coding task",
+  "SyncLoop reasoning protocol summary - inject as system context for any AI coding task",
   async () => ({
     description: "The SyncLoop 7-stage reasoning protocol for self-correcting agent behavior",
     messages: [{
@@ -204,5 +284,6 @@ server.prompt(
 // ---------------------------------------------------------------------------
 // Connect transport
 // ---------------------------------------------------------------------------
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

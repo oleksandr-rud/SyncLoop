@@ -62,59 +62,65 @@ Mode is selected in DECIDE+ACT and can change after each validation cycle.
 ### Layer Architecture
 
 ```
-Routes → Services → Repositories → Libs
-```
+bin/cli.js (CLI transport)
+    └──► src/init.js (core logic)
+              └──► template/ (static assets)
 
-{Replace with actual project layers. Map directories to layer roles.}
+src/server.js (MCP transport)
+    └──► src/init.js (core logic)
+              └──► template/ (static assets)
+```
 
 | Layer | Directory | Rules |
 |-------|-----------|-------|
-| **Routes** | `{path}` | Transport/boundary only. No business logic. |
-| **Services** | `{path}` | Business orchestration. Domain logic lives here. |
-| **Repositories** | `{path}` | Data access contracts. |
-| **Libs** | `{path}` | Infrastructure utilities. No imports from app modules. |
+| **CLI Transport** | `bin/` | Argument parsing and output formatting only. No scaffolding logic. Delegates to `src/init.js`. |
+| **MCP Transport** | `src/server.js` | Registers resources, tools, prompts. No scaffolding logic. Delegates to `src/init.js`. |
+| **Core Logic** | `src/init.js` | Stack detection, link rewriting, platform file generation. No transport concerns. |
+| **Templates** | `template/` | Static read-only source files. No imports from `src/`. |
 
 ### Cross-Layer Rules
 
-- **Never** import across incompatible layers (e.g., infra importing domain)
-- **Never** bypass the service layer from transport/route handlers
-- **Never** change public APIs without explicit approval
-- **Never** introduce sync calls in an async codebase (or vice versa)
-
-{Add project-specific cross-layer rules here.}
+- **Never** implement scaffolding logic directly in `bin/cli.js` or `src/server.js` — delegate to `src/init.js`
+- **Never** import from `src/` inside `template/` files (static content only)
+- **Never** change the `init()` or `detectStacks()` public API without updating both callers (`bin/cli.js` and `src/server.js`)
+- **Never** add Node.js-version-specific APIs without updating `engines.node` in `package.json`
 
 ---
 
 ## 5. Validation Commands
 
-{Fill in with actual project commands after bootstrap.}
-
 ```bash
-# Type check
-{typecheck command}
+# Smoke test CLI
+node bin/cli.js --help
 
-# Lint & format
-{lint command}
+# Dry-run scaffold (no writes)
+node bin/cli.js init --dry-run
+node bin/cli.js init --target copilot --dry-run
 
-# Tests (all)
-{test command}
-
-# Tests (targeted)
-{targeted test command}
+# Test MCP server starts without errors
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{}}}' | node bin/cli.js
 
 # Install deps
-{install command}
+npm install
+
+# Publish (requires npm login)
+npm publish --access public
 ```
 
 ---
 
 ## 6. Key Domain Terms
 
-{Fill in during bootstrap — see [glossary.md](.github/instructions/glossary.instructions.md) for canonical definitions.}
+See [glossary.md](.github/instructions/glossary.instructions.md) for full definitions.
 
 | Term | Model / Location | Description |
 |------|------------------|-------------|
-| {Term} | {file path} | {what it represents} |
+| `stack` | `src/init.js → detectStacks()` | Detected project technology unit (Node.js or Python) with its tools (testRunner, typeChecker, linter) |
+| `target` | `bin/cli.js`, `src/server.js` | Output platform: `copilot` \| `cursor` \| `claude` \| `all` |
+| `source file` | `src/init.js → SOURCE_FILES` | Template document with a canonical ID; maps to platform-specific output paths |
+| `platform config` | `src/init.js → COPILOT / CURSOR / CLAUDE` | Mapping of source IDs to target paths + frontmatter per platform |
+| `dry-run` | `bin/cli.js`, `src/init.js` | Preview mode — reports what would be written without modifying files |
+| `overwrite` | `src/init.js → writeOutput()` | Whether to replace existing generated files (default: `true`) |
 
 ---
 
@@ -138,8 +144,8 @@ Routes → Services → Repositories → Libs
 - ❌ Never suppress typing or validation just to remove errors
 - ❌ Never change public contracts without explicit approval
 - ❌ Never bypass architecture boundaries for convenience
-
-{Add project-specific rules here (e.g., multi-tenant isolation, audit requirements).}
+- ❌ Never rename the package/binary in one place — grep for all references across `package.json`, `bin/`, `src/`, `template/`, `README.md`, and `AGENTS.md`
+- ❌ Never skip `--dry-run` smoke test after scaffolding changes
 
 If uncertain, choose isolated and reversible changes.
 

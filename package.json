@@ -1,6 +1,6 @@
 {
   "name": "@oleksandr.rudnychenko/sync_loop",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "type": "module",
   "description": "MCP server for the SyncLoop agent reasoning protocol — works with Copilot, Cursor, Claude Code",
   "bin": {
@@ -8,8 +8,7 @@
   },
   "files": [
     "bin/",
-    "src/",
-    "template/"
+    "src/"
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
