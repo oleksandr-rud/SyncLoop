@@ -11,9 +11,9 @@ Add to your MCP client configuration:
 ```json
 {
   "mcpServers": {
-    "syncloop": {
+    "sync_loop": {
       "command": "npx",
-      "args": ["-y", "syncloop"]
+      "args": ["-y", "-p", "@oleksandr.rudnychenko/sync_loop", "sync_loop"]
     }
   }
 }
@@ -94,7 +94,7 @@ Three operational modes:
 If you also want the protocol files in your project (for offline use or customization), use the `init` tool:
 
 ```
-Use the syncloop init tool to scaffold files for copilot/cursor/claude/all
+Use the sync_loop init tool to scaffold files for copilot/cursor/claude/all
 ```
 
 When an AI agent performs this step, it should ask first:

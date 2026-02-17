@@ -88,7 +88,7 @@ const DOCS = {
 // Server
 // ---------------------------------------------------------------------------
 const server = new McpServer({
-  name: "syncloop",
+  name: "sync_loop",
   version: "0.1.0",
 });
 

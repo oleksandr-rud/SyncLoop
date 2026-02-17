@@ -9,7 +9,7 @@ Routes into `.github/instructions/` for reasoning protocol, validation, feedback
 
 ## 1. Project Identity
 
-MCP server + CLI for the SyncLoop agent reasoning protocol. Distributable via `npx syncloop`. Scaffolds platform-specific instruction files for Copilot, Cursor, and Claude Code.
+MCP server + CLI for the SyncLoop agent reasoning protocol. Distributable via `npx sync_loop`. Scaffolds platform-specific instruction files for Copilot, Cursor, and Claude Code.
 
 | Stack | Languages | Frameworks |
 |-------|-----------|------------|

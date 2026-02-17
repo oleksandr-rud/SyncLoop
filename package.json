@@ -1,10 +1,10 @@
 {
-  "name": "syncloop",
-  "version": "0.1.1",
+  "name": "@oleksandr.rudnychenko/sync_loop",
+  "version": "0.2.3",
   "type": "module",
   "description": "MCP server for the SyncLoop agent reasoning protocol — works with Copilot, Cursor, Claude Code",
   "bin": {
-    "syncloop": "./bin/cli.js"
+    "sync_loop": "./bin/cli.js"
   },
   "files": [
     "bin/",
@@ -25,9 +25,10 @@
     "prompt-engineering",
     "coding-agent",
     "reasoning-loop",
-    "syncloop"
+    "sync_loop"
   ],
   "license": "MIT",
+  "author": "oleksandr.rudnychenko",
   "engines": {
     "node": ">=18"
   }

@@ -11,9 +11,9 @@ Add the SyncLoop MCP server to your AI coding client. The agent gets the full pr
 ```json
 {
   "mcpServers": {
-    "syncloop": {
+      "sync_loop": {
       "command": "npx",
-      "args": ["-y", "syncloop"]
+         "args": ["-y", "-p", "@oleksandr.rudnychenko/sync_loop", "sync_loop"]
     }
   }
 }
@@ -38,7 +38,7 @@ If you want the protocol files in your project (for offline use, customization, 
 
 ### Via MCP (ask the agent)
 
-Ask: "Use the syncloop init tool to scaffold files for [copilot/cursor/claude/all] into this project"
+Ask: "Use the sync_loop init tool to scaffold files for [copilot/cursor/claude/all] into this project"
 
 Before calling `init`, the agent should ask:
 "Which SyncLoop target platform should I scaffold: `copilot`, `cursor`, `claude`, or `all`?"
