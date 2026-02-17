@@ -174,6 +174,7 @@ for (const [id, doc] of Object.entries(DOCS)) {
   server.registerResource(
     doc.name,
     `syncloop://docs/${id}`,
+    { description: doc.description, mimeType: "text/markdown" },
     async (uri) => {
       const raw = readTemplate(doc.path);
       const rewritten = rewriteResourceLinks(raw, doc.path);
@@ -205,13 +206,15 @@ const StackSchema = z.object({
 
 server.registerTool(
   "init",
-  "Scaffold SyncLoop protocol files into a project. If target is not explicitly provided, default to all. If stacks are not provided, auto-detect them by scanning the repository.",
   {
-    projectPath: z.string().optional().describe("Project root path. Defaults to current working directory."),
-    target: z.enum(["copilot", "cursor", "claude", "all"]).optional().default("all"),
-    stacks: z.array(StackSchema).optional().describe("Optional stack definitions. Auto-detected when omitted."),
-    dryRun: z.boolean().optional().default(false).describe("Preview file writes without modifying files."),
-    overwrite: z.boolean().optional().default(true).describe("Overwrite existing generated files."),
+    description: "Scaffold SyncLoop protocol files into a project. If target is not explicitly provided, default to all. If stacks are not provided, auto-detect them by scanning the repository.",
+    inputSchema: {
+      projectPath: z.string().optional().describe("Project root path. Defaults to current working directory."),
+      target: z.enum(["copilot", "cursor", "claude", "all"]).optional().default("all"),
+      stacks: z.array(StackSchema).optional().describe("Optional stack definitions. Auto-detected when omitted."),
+      dryRun: z.boolean().optional().default(false).describe("Preview file writes without modifying files."),
+      overwrite: z.boolean().optional().default(true).describe("Overwrite existing generated files."),
+    },
   },
   async ({ projectPath, target = "all", stacks, dryRun = false, overwrite = true }) => {
     try {
@@ -253,7 +256,7 @@ server.registerTool(
 
 server.registerPrompt(
   "bootstrap",
-  "Bootstrap prompt - wire SyncLoop protocol to an existing project by scanning its codebase",
+  { description: "Bootstrap prompt - wire SyncLoop protocol to an existing project by scanning its codebase" },
   async () => ({
     description: "Scan the project codebase and wire SyncLoop protocol references to real project structure",
     messages: [{
@@ -268,7 +271,7 @@ server.registerPrompt(
 
 server.registerPrompt(
   "protocol",
-  "SyncLoop reasoning protocol summary - inject as system context for any AI coding task",
+  { description: "SyncLoop reasoning protocol summary - inject as system context for any AI coding task" },
   async () => ({
     description: "The SyncLoop 7-stage reasoning protocol for self-correcting agent behavior",
     messages: [{

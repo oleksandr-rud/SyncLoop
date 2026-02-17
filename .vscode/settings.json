@@ -1,0 +1,10 @@
+{
+    "chat.mcp.serverSampling": {
+        "sync_loop/.vscode/mcp.json: sync_loop": {
+            "allowedModels": [
+                "copilot/claude-sonnet-4.6",
+                "copilot/gpt-5.3-codex"
+            ]
+        }
+    }
+}

@@ -98,7 +98,7 @@ node bin/cli.js init --dry-run
 node bin/cli.js init --target copilot --dry-run
 
 # Test MCP server starts without errors
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{}}}' | node bin/cli.js
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | node bin/cli.js
 
 # Install deps
 npm install
@@ -131,6 +131,7 @@ See [glossary.md](.github/instructions/glossary.instructions.md) for full defini
 | Protocol kernel | [.agent-loop/reasoning-kernel.md](.github/instructions/reasoning-kernel.instructions.md) | Master loop and execution schema |
 | Pattern registry | [.agent-loop/patterns.md](.github/instructions/patterns.instructions.md) | Pattern routing + learned fixes |
 | Pattern specs | [.agent-loop/patterns/](.github/instructions/) | Detailed implementation playbooks |
+| MCP pattern spec | [.agent-loop/patterns/mcp-patterns.md](.github/instructions/mcp-patterns.instructions.md) | M1–M5 bootstrap/resources/tools/prompts/lifecycle patterns |
 | Domain vocabulary | [.agent-loop/glossary.md](.github/instructions/glossary.instructions.md) | Canonical terms and naming |
 | ENV validation | [.agent-loop/validate-env.md](.github/instructions/validate-env.instructions.md) | NFR gates |
 | NEIGHBOR validation | [.agent-loop/validate-n.md](.github/instructions/validate-n.instructions.md) | Shape/boundary/bridge checks |
