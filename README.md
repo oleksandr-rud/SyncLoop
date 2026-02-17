@@ -231,13 +231,15 @@ Use the sync_loop init tool — choose: copilot, cursor, claude, or all
 
 | Target | Files generated |
 |--------|----------------|
-| `copilot` | `.github/copilot-instructions.md` + `.github/instructions/*.instructions.md` |
-| `cursor` | `.cursor/rules/*.md` with frontmatter |
-| `claude` | `CLAUDE.md` + `.claude/rules/*.md` |
-| `all` | All of the above + `AGENTS.md` + `.agent-loop/` canonical source |
+| `copilot` | `.agent-loop/` + `.github/copilot-instructions.md` + `.github/instructions/*.instructions.md` |
+| `cursor` | `.agent-loop/` + `.cursor/rules/*.md` with frontmatter |
+| `claude` | `.agent-loop/` + `CLAUDE.md` + `.claude/rules/*.md` |
+| `all` | All of the above + `AGENTS.md` |
 
 After scaffolding, use the `bootstrap` prompt so the agent scans your codebase and populates
 the generated files with real validation commands, architecture layers, and module boundaries.
+
+Platform instruction files are lightweight wrappers that delegate to `.agent-loop/*` canonical docs.
 
 ---
 

@@ -46,9 +46,9 @@ Usage:
     Show this help
 
 Init targets:
-  copilot   .github/instructions/ + copilot-instructions.md
-  cursor    .cursor/rules/ with frontmatter
-  claude    CLAUDE.md + .claude/rules/
+  copilot   .agent-loop/ + .github/instructions/ + copilot-instructions.md
+  cursor    .agent-loop/ + .cursor/rules/ with frontmatter
+  claude    .agent-loop/ + CLAUDE.md + .claude/rules/
   all       All of the above (default)
 
 Flags:
@@ -128,4 +128,3 @@ if (command === "init") {
 // Default: start MCP server
 // ---------------------------------------------------------------------------
 import("../src/server.js");
-

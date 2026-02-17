@@ -24,39 +24,6 @@ function toPosixPath(value) {
   return value.replace(/\\/g, "/");
 }
 
-function pathDir(value) {
-  const dir = posix.dirname(value);
-  return dir === "." ? "" : dir;
-}
-
-function splitHash(link) {
-  const idx = link.indexOf("#");
-  if (idx === -1) return { pathPart: link, hash: "" };
-  return {
-    pathPart: link.slice(0, idx),
-    hash: link.slice(idx),
-  };
-}
-
-function isExternalLink(link) {
-  return /^([a-z]+:|#)/i.test(link);
-}
-
-function rewriteMarkdownLinks(content, transform) {
-  let inFence = false;
-  return content
-    .split("\n")
-    .map((line) => {
-      if (line.trimStart().startsWith("```")) {
-        inFence = !inFence;
-        return line;
-      }
-      if (inFence) return line;
-      return line.replace(/\]\(([^)]+)\)/g, (_match, linkPath) => `](${transform(linkPath)})`);
-    })
-    .join("\n");
-}
-
 function readJsonSafe(path) {
   try {
     return JSON.parse(readFileSync(path, "utf-8"));
@@ -265,6 +232,19 @@ const SOURCE_FILES = [
   { id: "api-standards", path: ".agent-loop/patterns/api-standards.md" },
 ];
 
+const WRAPPER_FILES = [
+  { id: "reasoning-kernel", path: "wiring/reasoning-kernel.md" },
+  { id: "feedback", path: "wiring/feedback.md" },
+  { id: "validate-env", path: "wiring/validate-env.md" },
+  { id: "validate-n", path: "wiring/validate-n.md" },
+  { id: "patterns", path: "wiring/patterns.md" },
+  { id: "glossary", path: "wiring/glossary.md" },
+  { id: "code-patterns", path: "wiring/code-patterns.md" },
+  { id: "testing-guide", path: "wiring/testing-guide.md" },
+  { id: "refactoring-workflow", path: "wiring/refactoring-workflow.md" },
+  { id: "api-standards", path: "wiring/api-standards.md" },
+];
+
 // ---------------------------------------------------------------------------
 // Platform configs
 // ---------------------------------------------------------------------------
@@ -309,116 +289,6 @@ const CLAUDE = {
 };
 
 const PLATFORM_CONFIGS = { copilot: COPILOT, cursor: CURSOR, claude: CLAUDE };
-
-// ---------------------------------------------------------------------------
-// Link rewriting
-// ---------------------------------------------------------------------------
-
-const CANONICAL_TO_ID = {};
-for (const source of SOURCE_FILES) {
-  CANONICAL_TO_ID[source.path.replace(".agent-loop/", "")] = source.id;
-}
-
-function buildTargetMap(platform) {
-  const config = PLATFORM_CONFIGS[platform];
-  const map = {};
-  for (const [id, entry] of Object.entries(config)) {
-    map[id] = toPosixPath(entry.target);
-  }
-  return map;
-}
-
-function resolveCanonicalLink(linkPath, sourceId) {
-  const source = SOURCE_FILES.find((item) => item.id === sourceId);
-  if (!source) return linkPath;
-
-  const sourceRelPath = source.path.replace(".agent-loop/", "");
-  const sourceDir = pathDir(sourceRelPath);
-  const normalized = posix.normalize(posix.join(sourceDir || ".", linkPath));
-  return normalized.replace(/^\.\//, "");
-}
-
-function rewriteSpecLinks(content, sourceId, platform) {
-  const targetMap = buildTargetMap(platform);
-  const currentTargetPath = targetMap[sourceId];
-  const currentDir = pathDir(currentTargetPath);
-
-  return rewriteMarkdownLinks(content, (linkPath) => {
-    if (isExternalLink(linkPath)) return linkPath;
-
-    const { pathPart, hash } = splitHash(linkPath);
-    if (!pathPart) return linkPath;
-
-    const canonical = resolveCanonicalLink(pathPart, sourceId);
-
-    if (
-      pathPart === "../AGENTS.md" ||
-      canonical === "../AGENTS.md" ||
-      canonical === "AGENTS.md"
-    ) {
-      const rel = posix.relative(currentDir || ".", "AGENTS.md") || "AGENTS.md";
-      return `${rel}${hash}`;
-    }
-
-    if (
-      pathPart === "../README.md" ||
-      canonical === "../README.md"
-    ) {
-      const rel = posix.relative(currentDir || ".", "README.md") || "README.md";
-      return `${rel}${hash}`;
-    }
-
-    if (pathPart === "patterns/" || pathPart === "patterns") {
-      const targetPath = targetMap.patterns;
-      if (!targetPath) return linkPath;
-      const rel = posix.relative(currentDir || ".", targetPath) || posix.basename(targetPath);
-      return `${rel}${hash}`;
-    }
-
-    const docId = CANONICAL_TO_ID[canonical];
-    if (!docId) return linkPath;
-
-    const targetPath = targetMap[docId];
-    if (!targetPath) return linkPath;
-
-    const rel = posix.relative(currentDir || ".", targetPath) || posix.basename(targetPath);
-    return `${rel}${hash}`;
-  });
-}
-
-function rewriteAgentsLinks(content, platform) {
-  if (platform === "all") return content;
-
-  const config = PLATFORM_CONFIGS[platform];
-  const pathMap = {};
-  for (const source of SOURCE_FILES) {
-    const entry = config[source.id];
-    if (entry) pathMap[source.path] = entry.target;
-  }
-
-  const platformDir = Object.values(config)[0].target.split("/").slice(0, -1).join("/");
-  let result = content;
-
-  result = result.replace(/\]\(\.agent-loop\/([^)]+)\)/g, (_match, relPath) => {
-    const fullPath = `.agent-loop/${relPath}`;
-    if (pathMap[fullPath]) return `](${pathMap[fullPath]})`;
-    if (relPath === "patterns/" || relPath === "patterns") return `](${platformDir}/)`;
-    return `](${fullPath})`;
-  });
-
-  result = result.replace(/`\.agent-loop\/([^`]+)`/g, (_match, relPath) => {
-    const fullPath = `.agent-loop/${relPath}`;
-    if (pathMap[fullPath]) return `\`${pathMap[fullPath]}\``;
-    if (relPath.startsWith("patterns/") || relPath === "patterns") return `\`${platformDir}/\``;
-    return `\`${fullPath}\``;
-  });
-
-  result = result.replace(
-    /Routes into `\.agent-loop\/`/,
-    `Routes into \`${platformDir}/\``,
-  );
-  return result;
-}
 
 // ---------------------------------------------------------------------------
 // Environment placeholder replacement
@@ -466,21 +336,21 @@ function applyStacks(content, stacks) {
 function generatePlatformFiles(projectPath, platform, stacks, options) {
   const config = PLATFORM_CONFIGS[platform];
   const results = [];
+  const wrapperById = new Map(WRAPPER_FILES.map((item) => [item.id, item.path]));
 
   for (const source of SOURCE_FILES) {
     const entry = config[source.id];
     if (!entry) continue;
+    const wrapperPath = wrapperById.get(source.id);
+    if (!wrapperPath) continue;
 
-    let content = applyStacks(readTemplate(source.path), stacks);
-    content = rewriteSpecLinks(content, source.id, platform);
+    const content = applyStacks(readTemplate(wrapperPath), stacks);
     const frontmatter = yamlFrontmatter(entry.fm);
     const writeResult = writeOutput(projectPath, entry.target, `${frontmatter}\n\n${content}`, options);
     results.push(`  ${formatWriteResult(writeResult)}`);
   }
 
-  const platformDir = Object.values(config)[0].target.split("/").slice(0, -1).join("/");
-  const summary = readTemplate("protocol-summary.md")
-    .replace(/`\.agent-loop\/`/, `\`${platformDir}/\``);
+  const summary = readTemplate("protocol-summary.md");
 
   if (platform === "copilot") {
     const writeResult = writeOutput(projectPath, ".github/copilot-instructions.md", summary, options);
@@ -516,39 +386,34 @@ export function init(projectPath, target = "all", stacks = [], options = {}) {
 
   const results = [];
 
-  if (target === "all") {
-    const src = join(TEMPLATE_DIR, ".agent-loop");
-    const dest = join(root, ".agent-loop");
+  const src = join(TEMPLATE_DIR, ".agent-loop");
+  const dest = join(root, ".agent-loop");
 
-    if (!mergedOptions.dryRun) {
-      cpSync(src, dest, {
-        recursive: true,
-        force: mergedOptions.overwrite,
-        errorOnExist: false,
-      });
+  if (!mergedOptions.dryRun) {
+    cpSync(src, dest, {
+      recursive: true,
+      force: mergedOptions.overwrite,
+      errorOnExist: false,
+    });
 
-      if (effectiveStacks.length > 0) {
-        for (const source of SOURCE_FILES) {
-          const destFile = join(root, source.path);
-          if (!mergedOptions.overwrite && existsSync(destFile)) continue;
-          try {
-            const current = readFileSync(destFile, "utf-8");
-            const updated = applyStacks(current, effectiveStacks);
-            if (updated !== current) writeFileSync(destFile, updated, "utf-8");
-          } catch {
-            // Ignore files that are missing after copy.
-          }
+    if (effectiveStacks.length > 0) {
+      for (const source of SOURCE_FILES) {
+        const destFile = join(root, source.path);
+        if (!mergedOptions.overwrite && existsSync(destFile)) continue;
+        try {
+          const current = readFileSync(destFile, "utf-8");
+          const updated = applyStacks(current, effectiveStacks);
+          if (updated !== current) writeFileSync(destFile, updated, "utf-8");
+        } catch {
+          // Ignore files that are missing after copy.
         }
       }
     }
-
-    results.push(`.agent-loop/ (canonical source${mergedOptions.dryRun ? ", dry-run" : ""})`);
   }
 
-  const agentsContent = rewriteAgentsLinks(
-    applyStacks(readTemplate("AGENTS.md"), effectiveStacks),
-    target === "all" ? "all" : target,
-  );
+  results.push(`.agent-loop/ (canonical source${mergedOptions.dryRun ? ", dry-run" : ""})`);
+
+  const agentsContent = applyStacks(readTemplate("AGENTS.md"), effectiveStacks);
   const agentsResult = writeOutput(root, "AGENTS.md", agentsContent, mergedOptions);
   results.push(`AGENTS.md (cross-platform entrypoint: ${formatWriteResult(agentsResult)})`);
 
