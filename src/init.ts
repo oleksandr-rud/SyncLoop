@@ -12,27 +12,68 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = join(__dirname, "template");
 
+export type InitTarget = "copilot" | "cursor" | "claude" | "all";
+
+export interface StackDefinition {
+  name: string;
+  languages: string[];
+  frameworks: string[];
+  testRunner?: string;
+  typeChecker?: string;
+  linter?: string;
+  packageManager?: string;
+  path?: string;
+}
+
+export interface InitOptions {
+  dryRun?: boolean;
+  overwrite?: boolean;
+}
+
+interface PackageJson {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  scripts?: Record<string, string>;
+}
+
+interface WriteOutputResult {
+  path: string;
+  status: "skipped" | "would-overwrite" | "would-create" | "overwritten" | "created";
+}
+
+interface SourceFile {
+  id: string;
+  path: string;
+}
+
+interface PlatformFileConfig {
+  target: string;
+  fm: Record<string, string | boolean | string[]>;
+}
+
+type PlatformConfig = Record<string, PlatformFileConfig>;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function readTemplate(relativePath) {
+function readTemplate(relativePath: string): string {
   return readFileSync(join(TEMPLATE_DIR, relativePath), "utf-8");
 }
 
-function toPosixPath(value) {
+function toPosixPath(value: string): string {
   return value.replace(/\\/g, "/");
 }
 
-function readJsonSafe(path) {
+function readJsonSafe(path: string): PackageJson | null {
   try {
-    return JSON.parse(readFileSync(path, "utf-8"));
+    return JSON.parse(readFileSync(path, "utf-8")) as PackageJson;
   } catch {
     return null;
   }
 }
 
-function detectPackageManager(dirPath) {
+function detectPackageManager(dirPath: string): string {
   if (existsSync(join(dirPath, "pnpm-lock.yaml"))) return "pnpm";
   if (existsSync(join(dirPath, "yarn.lock"))) return "yarn";
   if (existsSync(join(dirPath, "package-lock.json"))) return "npm";
@@ -40,17 +81,17 @@ function detectPackageManager(dirPath) {
   return "npm";
 }
 
-function runCommandPrefix(packageManager) {
+function runCommandPrefix(packageManager: string): string {
   if (packageManager === "npm") return "npm run";
   if (packageManager === "pnpm") return "pnpm";
   if (packageManager === "yarn") return "yarn";
   return `${packageManager} run`;
 }
 
-function detectNodeFrameworks(pkg) {
-  const deps = { ...(pkg?.dependencies ?? {}), ...(pkg?.devDependencies ?? {}) };
-  const frameworks = [];
-  const known = [
+function detectNodeFrameworks(pkg: PackageJson): string[] {
+  const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+  const frameworks: string[] = [];
+  const known: Array<[string, string]> = [
     ["next", "Next.js"],
     ["react", "React"],
     ["vite", "Vite"],
@@ -64,13 +105,15 @@ function detectNodeFrameworks(pkg) {
     ["@tanstack/react-query", "TanStack Query"],
     ["zustand", "Zustand"],
   ];
+
   for (const [dep, name] of known) {
     if (deps[dep]) frameworks.push(name);
   }
+
   return frameworks;
 }
 
-function detectNodeStack(projectPath, relativePath = "") {
+function detectNodeStack(projectPath: string, relativePath = ""): StackDefinition | null {
   const stackRoot = join(projectPath, relativePath);
   const pkgPath = join(stackRoot, "package.json");
   if (!existsSync(pkgPath)) return null;
@@ -98,7 +141,7 @@ function detectNodeStack(projectPath, relativePath = "") {
   };
 }
 
-function detectPythonStack(projectPath, relativePath = "") {
+function detectPythonStack(projectPath: string, relativePath = ""): StackDefinition | null {
   const stackRoot = join(projectPath, relativePath);
   const pyprojectPath = join(stackRoot, "pyproject.toml");
   const requirementsPath = join(stackRoot, "requirements.txt");
@@ -108,7 +151,7 @@ function detectPythonStack(projectPath, relativePath = "") {
   const reqs = existsSync(requirementsPath) ? readFileSync(requirementsPath, "utf-8").toLowerCase() : "";
   const merged = `${pyproject}\n${reqs}`;
 
-  const frameworks = [];
+  const frameworks: string[] = [];
   if (merged.includes("fastapi")) frameworks.push("FastAPI");
   if (merged.includes("django")) frameworks.push("Django");
   if (merged.includes("flask")) frameworks.push("Flask");
@@ -132,7 +175,7 @@ function detectPythonStack(projectPath, relativePath = "") {
   };
 }
 
-export function detectStacks(projectPath) {
+export function detectStacks(projectPath: string): StackDefinition[] {
   const root = resolve(projectPath);
   const candidates = [""];
 
@@ -143,7 +186,7 @@ export function detectStacks(projectPath) {
     candidates.push(entry.name);
   }
 
-  const stacks = [];
+  const stacks: StackDefinition[] = [];
   for (const rel of candidates) {
     const nodeStack = detectNodeStack(root, rel);
     if (nodeStack) stacks.push(nodeStack);
@@ -151,8 +194,8 @@ export function detectStacks(projectPath) {
     if (pythonStack) stacks.push(pythonStack);
   }
 
-  const deduped = [];
-  const seen = new Set();
+  const deduped: StackDefinition[] = [];
+  const seen = new Set<string>();
   for (const stack of stacks) {
     const key = `${stack.name}:${stack.path ?? ""}:${stack.languages.join(",")}`;
     if (seen.has(key)) continue;
@@ -171,7 +214,12 @@ export function detectStacks(projectPath) {
   return deduped;
 }
 
-function writeOutput(projectPath, relativePath, content, options = {}) {
+function writeOutput(
+  projectPath: string,
+  relativePath: string,
+  content: string,
+  options: InitOptions = {},
+): WriteOutputResult {
   const { dryRun = false, overwrite = true } = options;
   const fullPath = join(projectPath, relativePath);
   const alreadyExists = existsSync(fullPath);
@@ -191,13 +239,13 @@ function writeOutput(projectPath, relativePath, content, options = {}) {
   return { path: relativePath, status: alreadyExists ? "overwritten" : "created" };
 }
 
-function formatWriteResult(result) {
+function formatWriteResult(result: WriteOutputResult): string {
   if (result.status === "skipped") return `${result.path} (skipped: exists)`;
   if (result.status.startsWith("would-")) return `${result.path} (dry-run)`;
   return result.path;
 }
 
-function yamlFrontmatter(fields) {
+function yamlFrontmatter(fields: Record<string, string | boolean | string[]>): string {
   const lines = ["---"];
   for (const [key, value] of Object.entries(fields)) {
     if (Array.isArray(value)) {
@@ -219,7 +267,7 @@ function yamlFrontmatter(fields) {
 // Source file list (maps to src/template/.agent-loop/)
 // ---------------------------------------------------------------------------
 
-const SOURCE_FILES = [
+const SOURCE_FILES: SourceFile[] = [
   { id: "reasoning-kernel", path: ".agent-loop/reasoning-kernel.md" },
   { id: "feedback", path: ".agent-loop/feedback.md" },
   { id: "validate-env", path: ".agent-loop/validate-env.md" },
@@ -232,7 +280,7 @@ const SOURCE_FILES = [
   { id: "api-standards", path: ".agent-loop/patterns/api-standards.md" },
 ];
 
-const WRAPPER_FILES = [
+const WRAPPER_FILES: SourceFile[] = [
   { id: "reasoning-kernel", path: "wiring/reasoning-kernel.md" },
   { id: "feedback", path: "wiring/feedback.md" },
   { id: "validate-env", path: "wiring/validate-env.md" },
@@ -249,7 +297,7 @@ const WRAPPER_FILES = [
 // Platform configs
 // ---------------------------------------------------------------------------
 
-const COPILOT = {
+const COPILOT: PlatformConfig = {
   "reasoning-kernel": { target: ".github/instructions/reasoning-kernel.instructions.md", fm: { name: "SyncLoop: Reasoning Kernel", description: "7-stage agent reasoning loop with context clearage", applyTo: "**/*" } },
   "feedback": { target: ".github/instructions/feedback.instructions.md", fm: { name: "SyncLoop: Feedback Loop", description: "Failure diagnosis, patch protocol, branch pruning", applyTo: "**/*" } },
   "validate-env": { target: ".github/instructions/validate-env.instructions.md", fm: { name: "SyncLoop: Validate Environment", description: "NFR gates: types, tests, layers, complexity", applyTo: "**/*" } },
@@ -262,7 +310,7 @@ const COPILOT = {
   "api-standards": { target: ".github/instructions/api-standards.instructions.md", fm: { name: "SyncLoop: API Standards", description: "Boundary contracts and API conventions", applyTo: "{routes,routers,controllers,api}/**/*" } },
 };
 
-const CURSOR = {
+const CURSOR: PlatformConfig = {
   "reasoning-kernel": { target: ".cursor/rules/01-reasoning-kernel.md", fm: { description: "7-stage agent reasoning loop with context clearage and transitions", alwaysApply: true } },
   "feedback": { target: ".cursor/rules/02-feedback.md", fm: { description: "Failure diagnosis, patch protocol, micro-loop, branch pruning", alwaysApply: true } },
   "validate-env": { target: ".cursor/rules/03-validate-env.md", fm: { description: "Stage 1 NFR gates: types, tests, layers, complexity, debug hygiene", alwaysApply: true } },
@@ -275,7 +323,7 @@ const CURSOR = {
   "api-standards": { target: ".cursor/rules/10-api-standards.md", fm: { description: "Boundary contracts, typed models, error envelopes", globs: "{routes,routers,controllers,api}/**/*" } },
 };
 
-const CLAUDE = {
+const CLAUDE: PlatformConfig = {
   "reasoning-kernel": { target: ".claude/rules/reasoning-kernel.md", fm: { paths: ["**/*"] } },
   "feedback": { target: ".claude/rules/feedback.md", fm: { paths: ["**/*"] } },
   "validate-env": { target: ".claude/rules/validate-env.md", fm: { paths: ["**/*"] } },
@@ -288,26 +336,30 @@ const CLAUDE = {
   "api-standards": { target: ".claude/rules/api-standards.md", fm: { paths: ["**/routes/**", "**/api/**", "**/controllers/**"] } },
 };
 
-const PLATFORM_CONFIGS = { copilot: COPILOT, cursor: CURSOR, claude: CLAUDE };
+const PLATFORM_CONFIGS: Record<Exclude<InitTarget, "all">, PlatformConfig> = {
+  copilot: COPILOT,
+  cursor: CURSOR,
+  claude: CLAUDE,
+};
 
 // ---------------------------------------------------------------------------
 // Environment placeholder replacement
 // ---------------------------------------------------------------------------
 
-function applyStacks(content, stacks) {
+function applyStacks(content: string, stacks: StackDefinition[]): string {
   if (!stacks || stacks.length === 0) return content;
 
-  const testRunners = stacks.map((stack) => stack.testRunner).filter(Boolean);
-  const typeCheckers = stacks.map((stack) => stack.typeChecker).filter(Boolean);
-  const linters = stacks.map((stack) => stack.linter).filter(Boolean);
-  const packageManagers = [...new Set(stacks.map((stack) => stack.packageManager).filter(Boolean))];
+  const testRunners = stacks.map((stack) => stack.testRunner).filter(Boolean) as string[];
+  const typeCheckers = stacks.map((stack) => stack.typeChecker).filter(Boolean) as string[];
+  const linters = stacks.map((stack) => stack.linter).filter(Boolean) as string[];
+  const packageManagers = [...new Set(stacks.map((stack) => stack.packageManager).filter(Boolean) as string[])];
 
   const stackRows = stacks
     .map((stack) => `| ${stack.name}${stack.path ? ` (\`${stack.path}\`)` : ""} | ${stack.languages.join(", ")} | ${stack.frameworks.join(", ")} |`)
     .join("\n");
   const stackTable = `| Stack | Languages | Frameworks |\n|-------|-----------|------------|\n${stackRows}`;
 
-  const replacements = {
+  const replacements: Record<string, string> = {
     "{typecheck command}": typeCheckers.join(" && ") || "{typecheck command}",
     "{lint command}": linters.join(" && ") || "{lint command}",
     "{test command}": testRunners.join(" && ") || "{test command}",
@@ -333,9 +385,14 @@ function applyStacks(content, stacks) {
 // Platform file generation
 // ---------------------------------------------------------------------------
 
-function generatePlatformFiles(projectPath, platform, stacks, options) {
+function generatePlatformFiles(
+  projectPath: string,
+  platform: Exclude<InitTarget, "all">,
+  stacks: StackDefinition[],
+  options: InitOptions,
+): string[] {
   const config = PLATFORM_CONFIGS[platform];
-  const results = [];
+  const results: string[] = [];
   const wrapperById = new Map(WRAPPER_FILES.map((item) => [item.id, item.path]));
 
   for (const source of SOURCE_FILES) {
@@ -371,20 +428,32 @@ function generatePlatformFiles(projectPath, platform, stacks, options) {
 // Public API
 // ---------------------------------------------------------------------------
 
-export function init(projectPath, target = "all", stacks = [], options = {}) {
+export function init(
+  projectPath: string,
+  target: InitTarget = "all",
+  stacks: StackDefinition[] = [],
+  options: InitOptions = {},
+): {
+  projectPath: string;
+  target: InitTarget;
+  dryRun: boolean;
+  overwrite: boolean;
+  stacks: StackDefinition[];
+  results: string[];
+} {
   const root = resolve(projectPath);
-  const effectiveStacks = stacks?.length ? stacks : detectStacks(root);
+  const effectiveStacks = stacks.length > 0 ? stacks : detectStacks(root);
   const mergedOptions = {
     dryRun: Boolean(options.dryRun),
     overwrite: options.overwrite ?? true,
   };
 
-  const validTargets = ["copilot", "cursor", "claude", "all"];
+  const validTargets: InitTarget[] = ["copilot", "cursor", "claude", "all"];
   if (!validTargets.includes(target)) {
     throw new Error(`Unknown target "${target}". Use one of: ${validTargets.join(", ")}`);
   }
 
-  const results = [];
+  const results: string[] = [];
 
   const src = join(TEMPLATE_DIR, ".agent-loop");
   const dest = join(root, ".agent-loop");
@@ -417,7 +486,10 @@ export function init(projectPath, target = "all", stacks = [], options = {}) {
   const agentsResult = writeOutput(root, "AGENTS.md", agentsContent, mergedOptions);
   results.push(`AGENTS.md (cross-platform entrypoint: ${formatWriteResult(agentsResult)})`);
 
-  const targets = target === "all" ? ["copilot", "cursor", "claude"] : [target];
+  const targets: Exclude<InitTarget, "all">[] = target === "all"
+    ? ["copilot", "cursor", "claude"]
+    : [target];
+
   for (const currentTarget of targets) {
     results.push(`\n[${currentTarget}]`);
     results.push(...generatePlatformFiles(root, currentTarget, effectiveStacks, mergedOptions));

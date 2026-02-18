@@ -1,18 +1,32 @@
 {
   "name": "@oleksandr.rudnychenko/sync_loop",
-  "version": "0.2.5",
+  "version": "0.3.1",
   "type": "module",
-  "description": "MCP server for the SyncLoop agent reasoning protocol — works with Copilot, Cursor, Claude Code",
+  "description": "MCP server for the SyncLoop agent reasoning protocol - works with Copilot, Cursor, Claude Code",
   "bin": {
     "sync_loop": "./bin/cli.js"
   },
   "files": [
     "bin/",
-    "src/"
+    "dist/",
+    "src/template/"
   ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-template.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/**/*.test.ts",
+    "prepack": "npm run build && npm test",
+    "publish:public:dry-run": "npm version patch --no-git-tag-version && npm publish --access public --dry-run",
+    "publish:public": "npm version patch --no-git-tag-version && npm publish --access public"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   },
   "keywords": [
     "mcp",

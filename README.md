@@ -243,6 +243,25 @@ Platform instruction files are lightweight wrappers that delegate to `.agent-loo
 
 ---
 
+## Development
+
+```bash
+npm install
+npm run typecheck
+npm test
+```
+
+`npm test` runs a full TypeScript build first, then executes the automated test suite.
+
+### Publish to npm (public)
+
+```bash
+npm run publish:public:dry-run
+npm run publish:public
+```
+
+---
+
 ## License
 
 MIT

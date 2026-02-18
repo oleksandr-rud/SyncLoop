@@ -13,9 +13,9 @@ MCP server + CLI for the SyncLoop agent reasoning protocol. Distributable via `n
 
 | Stack | Languages | Frameworks |
 |-------|-----------|------------|
-| mcp-server | JavaScript (ESM) | @modelcontextprotocol/sdk, zod |
+| mcp-server | TypeScript + JavaScript (ESM runtime) | @modelcontextprotocol/sdk, zod |
 
-**Architecture source of truth:** `src/server.js` (MCP server), `src/init.js` (scaffolding logic) — code is authoritative when docs conflict.
+**Architecture source of truth:** `src/server.ts` (MCP server), `src/init.ts` (scaffolding logic) — code is authoritative when docs conflict.
 
 ---
 
@@ -62,27 +62,27 @@ Mode is selected in DECIDE+ACT and can change after each validation cycle.
 ### Layer Architecture
 
 ```
-bin/cli.js (CLI transport)
-    └──► src/init.js (core logic)
+bin/cli.ts (CLI transport source)
+    └──► src/init.ts (core logic)
               └──► template/ (static assets)
 
-src/server.js (MCP transport)
-    └──► src/init.js (core logic)
+src/server.ts (MCP transport)
+    └──► src/init.ts (core logic)
               └──► template/ (static assets)
 ```
 
 | Layer | Directory | Rules |
 |-------|-----------|-------|
-| **CLI Transport** | `bin/` | Argument parsing and output formatting only. No scaffolding logic. Delegates to `src/init.js`. |
-| **MCP Transport** | `src/server.js` | Registers resources, tools, prompts. No scaffolding logic. Delegates to `src/init.js`. |
-| **Core Logic** | `src/init.js` | Stack detection, link rewriting, platform file generation. No transport concerns. |
+| **CLI Transport** | `bin/` | Argument parsing and output formatting only. No scaffolding logic. Delegates to `src/init.ts`. |
+| **MCP Transport** | `src/server.ts` | Registers resources, tools, prompts. No scaffolding logic. Delegates to `src/init.ts`. |
+| **Core Logic** | `src/init.ts` | Stack detection, link rewriting, platform file generation. No transport concerns. |
 | **Templates** | `template/` | Static read-only source files. No imports from `src/`. |
 
 ### Cross-Layer Rules
 
-- **Never** implement scaffolding logic directly in `bin/cli.js` or `src/server.js` — delegate to `src/init.js`
+- **Never** implement scaffolding logic directly in `bin/cli.ts` or `src/server.ts` — delegate to `src/init.ts`
 - **Never** import from `src/` inside `template/` files (static content only)
-- **Never** change the `init()` or `detectStacks()` public API without updating both callers (`bin/cli.js` and `src/server.js`)
+- **Never** change the `init()` or `detectStacks()` public API without updating both callers (`bin/cli.ts` and `src/server.ts`)
 - **Never** add Node.js-version-specific APIs without updating `engines.node` in `package.json`
 
 ---
@@ -90,6 +90,13 @@ src/server.js (MCP transport)
 ## 5. Validation Commands
 
 ```bash
+# Install deps + build artifacts
+npm install
+
+# Type check + tests
+npm run typecheck
+npm test
+
 # Smoke test CLI
 node bin/cli.js --help
 
@@ -99,9 +106,6 @@ node bin/cli.js init --target copilot --dry-run
 
 # Test MCP server starts without errors
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | node bin/cli.js
-
-# Install deps
-npm install
 
 # Publish (requires npm login)
 npm publish --access public
@@ -115,12 +119,12 @@ See [glossary.md](.github/instructions/glossary.instructions.md) for full defini
 
 | Term | Model / Location | Description |
 |------|------------------|-------------|
-| `stack` | `src/init.js → detectStacks()` | Detected project technology unit (Node.js or Python) with its tools (testRunner, typeChecker, linter) |
-| `target` | `bin/cli.js`, `src/server.js` | Output platform: `copilot` \| `cursor` \| `claude` \| `all` |
-| `source file` | `src/init.js → SOURCE_FILES` | Template document with a canonical ID; maps to platform-specific output paths |
-| `platform config` | `src/init.js → COPILOT / CURSOR / CLAUDE` | Mapping of source IDs to target paths + frontmatter per platform |
-| `dry-run` | `bin/cli.js`, `src/init.js` | Preview mode — reports what would be written without modifying files |
-| `overwrite` | `src/init.js → writeOutput()` | Whether to replace existing generated files (default: `true`) |
+| `stack` | `src/init.ts → detectStacks()` | Detected project technology unit (Node.js or Python) with its tools (testRunner, typeChecker, linter) |
+| `target` | `bin/cli.ts`, `src/server.ts` | Output platform: `copilot` \| `cursor` \| `claude` \| `all` |
+| `source file` | `src/init.ts → SOURCE_FILES` | Template document with a canonical ID; maps to platform-specific output paths |
+| `platform config` | `src/init.ts → COPILOT / CURSOR / CLAUDE` | Mapping of source IDs to target paths + frontmatter per platform |
+| `dry-run` | `bin/cli.ts`, `src/init.ts` | Preview mode — reports what would be written without modifying files |
+| `overwrite` | `src/init.ts → writeOutput()` | Whether to replace existing generated files (default: `true`) |
 
 ---
 

@@ -66,5 +66,5 @@ SENSE → GKP → DECIDE+ACT → CHALLENGE-TEST → UPDATE → LEARN → REPORT
 
 > **Windows (VS Code):** use `"command": "npx.cmd"` — VS Code spawns without a shell, so `.cmd` wrappers must be explicit.
 
-Full protocol details available via SyncLoop MCP resources or in `.github/instructions/` directory.
-MCP-specific patterns (bootstrap, resources, tools, prompts, lifecycle): `.github/instructions/mcp-patterns.instructions.md`.
+Full protocol details available via SyncLoop MCP resources or in `.agent-loop/` directory.
+MCP-specific patterns (bootstrap, resources, tools, prompts, lifecycle): `.agent-loop/patterns/mcp-patterns.md`.
