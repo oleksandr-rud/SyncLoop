@@ -254,7 +254,7 @@ Input:  { projectPath?, target?, stacks?, dryRun?, overwrite? }
 Output: content[] with init results, stack summary, bootstrap prompt, JSON result
 ```
 
-**Never** implement scaffolding logic inside the tool handler — delegate to `init()` from `src/init.js`.
+**Never** implement scaffolding logic inside the tool handler — delegate to `init()` from `src/init.ts`.
 
 ---
 
@@ -365,7 +365,7 @@ Expected: JSON response with `result.serverInfo.name === "sync_loop"` and `resul
 | `clientInfo` validation error on initialize | SDK requires `clientInfo` object in `initialize` params | Add `"clientInfo": {"name":"...","version":"..."}` to test payload |
 | Resource content has broken links | `rewriteResourceLinks()` not called | Always call before returning `contents` |
 | New template file not showing as resource | Not added to `DOCS` map in `server.js` | Add entry to `DOCS` — auto-registration handles the rest |
-| Tool logic leaking into `server.js` | Scaffolding code written in tool handler | Delegate to `src/init.js` — transport layer is boundary only |
+| Tool logic leaking into `server.ts` | Scaffolding code written in tool handler | Delegate to `src/init.ts` — transport layer is boundary only |
 | `typedHandler is not a function` | Old SDK API: passing description string as 2nd arg | Use config object: `{ description, inputSchema }` as 2nd arg |
 
 ---

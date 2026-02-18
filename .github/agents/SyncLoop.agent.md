@@ -55,13 +55,13 @@ Full protocol spec: `.agent-loop/reasoning-kernel.md`
 ## Architecture
 
 ```
-bin/cli.js          ─┬► src/init.js ► src/template/
-src/server.js (MCP) ─┘
+bin/cli.ts          ─┬► src/init.ts ► src/template/
+src/server.ts (MCP) ─┘
 ```
 
-- `bin/cli.js` — argument parsing only; delegates all scaffolding to `src/init.js`
-- `src/server.js` — MCP resource/tool/prompt registration only; delegates to `src/init.js`
-- `src/init.js` — all core logic: stack detection, link rewriting, file generation
+- `bin/cli.ts` — argument parsing only; delegates all scaffolding to `src/init.ts`
+- `src/server.ts` — MCP resource/tool/prompt registration only; delegates to `src/init.ts`
+- `src/init.ts` — all core logic: stack detection, link rewriting, file generation
 - `src/template/` — read-only static assets; never import from `src/`
 
 ---

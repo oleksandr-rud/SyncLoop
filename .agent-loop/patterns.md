@@ -17,18 +17,18 @@ Referenced from [reasoning-kernel.md](reasoning-kernel.md).
 ## Architecture Baseline
 
 ```
-CLI Transport (bin/) ─┬► Init Logic (src/init.js) ► Templates (template/)
+CLI Transport (bin/) ─┬► Init Logic (src/init.ts) ► Templates (template/)
 MCP Transport (src/) ─┘
 ```
 
 ### Layer Intent
-- **`bin/cli.js`**: Argument parsing and output formatting only. Delegates all scaffolding to `src/init.js`.
-- **`src/server.js`**: MCP resource/tool/prompt registration only. Delegates all scaffolding to `src/init.js`.
-- **`src/init.js`**: All core logic — stack detection, link rewriting, placeholder substitution, file generation. No transport concerns.
+- **`bin/cli.ts`**: Argument parsing and output formatting only. Delegates all scaffolding to `src/init.ts`.
+- **`src/server.ts`**: MCP resource/tool/prompt registration only. Delegates all scaffolding to `src/init.ts`.
+- **`src/init.ts`**: All core logic — stack detection, link rewriting, placeholder substitution, file generation. No transport concerns.
 - **`template/`**: Read-only static assets. Never import from `src/`.
 
 ### Non-Bypass Rules
-- Never implement scaffolding logic in `bin/cli.js` or `src/server.js` — delegate to `src/init.js`
+- Never implement scaffolding logic in `bin/cli.ts` or `src/server.ts` — delegate to `src/init.ts`
 - Never change `init()` or `detectStacks()` signatures without updating both callers
 - Never change public APIs without explicit approval
 - Never rename `sync_loop` (package/binary) in one place — update all references atomically
@@ -157,7 +157,7 @@ Documentation and contract requirements for boundary endpoints: typed models, do
 |---------------|----------|
 | CLI entry point | `bin/cli.js` |
 | MCP server | `src/server.js` |
-| Core scaffolding logic | `src/init.js` |
+| Core scaffolding logic | `src/init.ts` |
 | Protocol template files | `template/.agent-loop/` |
 | Agent bootstrap templates | `template/AGENTS.md`, `template/protocol-summary.md`, `template/bootstrap-prompt.md` |
 
