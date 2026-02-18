@@ -412,6 +412,10 @@ function generatePlatformFiles(
   if (platform === "copilot") {
     const writeResult = writeOutput(projectPath, ".github/copilot-instructions.md", summary, options);
     results.push(`  ${formatWriteResult(writeResult)}`);
+
+    const agentBody = applyStacks(readTemplate("wiring/agents-github.md"), stacks);
+    const agentResult = writeOutput(projectPath, ".github/agents/SyncLoop.agent.md", agentBody, options);
+    results.push(`  ${formatWriteResult(agentResult)}`);
   } else if (platform === "cursor") {
     const frontmatter = yamlFrontmatter({ description: "SyncLoop protocol summary and guardrails", alwaysApply: true });
     const writeResult = writeOutput(projectPath, ".cursor/rules/00-protocol.md", `${frontmatter}\n\n${summary}`, options);
@@ -419,6 +423,10 @@ function generatePlatformFiles(
   } else if (platform === "claude") {
     const writeResult = writeOutput(projectPath, "CLAUDE.md", summary, options);
     results.push(`  ${formatWriteResult(writeResult)}`);
+
+    const agentBody = applyStacks(readTemplate("wiring/agents-claude.md"), stacks);
+    const agentResult = writeOutput(projectPath, ".claude/agents/SyncLoop.md", agentBody, options);
+    results.push(`  ${formatWriteResult(agentResult)}`);
   }
 
   return results;
