@@ -1,29 +1,29 @@
 # SyncLoop
 
-**Give your AI coding agent a structured reasoning loop.**
+**Stop your AI agent from guessing. Give it a reasoning loop.**
 
-Without a protocol, AI agents guess — they hallucinate fixes, ignore architecture rules, fail silently, and lose context across a long session. SyncLoop solves this by wiring a strict 7-stage reasoning loop directly into your agent via MCP, so every task goes through sense → plan → act → validate → learn, every turn.
+AI coding agents hallucinate fixes, ignore your architecture, lose context in long sessions, and repeat the same mistakes. SyncLoop wires a 7-stage self-correcting loop into your agent via MCP — sense → plan → act → validate → learn — every turn, automatically.
 
-Works with **GitHub Copilot**, **Cursor**, and **Claude Code** — any client that supports [Model Context Protocol](https://modelcontextprotocol.io/).
+Works with **GitHub Copilot**, **Cursor**, and **Claude Code**.
 
 ---
 
-## Why it matters
+## What changes for you
 
-| Without SyncLoop | With SyncLoop |
-|------------------|---------------|
-| Agent jumps straight to coding | Agent senses state and gaps first |
-| Fixes symptoms, not root causes | Diagnoses root cause before patching |
-| Ignores architecture layers | Enforces layer rules on every change |
-| Loses context in long sessions | Compresses and clears context each cycle |
-| Repeats the same mistakes | Learns from failures, persists heuristics |
-| No self-correction on test failures | Retries with targeted patches (max 5 iterations) |
+| Problem | How SyncLoop fixes it |
+|---------|----------------------|
+| Agent breaks your architecture | Layer rules enforced on every change |
+| Same bug reappears after agent "fixes" it | Agent retries with targeted patches, max 5 attempts, then escalates |
+| Agent loses track in long sessions | Context compressed after each cycle — stale data discarded |
+| Agent repeats failed approaches | Failed approaches pruned and recorded as hard constraints |
+| Tests modified to pass | Agent is hardcoded to fix source code, never tests |
+| No record of what the agent did or why | Structured reports and backlog tasks generated automatically |
 
 ---
 
 ## Quick Start
 
-Add to your MCP client configuration:
+### 1. Add to your MCP config
 
 ```json
 {
@@ -36,173 +36,115 @@ Add to your MCP client configuration:
 }
 ```
 
-That's it. Your agent now runs the full SyncLoop protocol on every turn.
+> **Windows (VS Code):** use `"command": "npx.cmd"` — VS Code spawns without a shell on Windows.
 
-### Where to add the config
-
-| Client | Config location |
-|--------|----------------|
+| Client | Where to add it |
+|--------|-----------------|
 | **VS Code (Copilot)** | `.vscode/mcp.json` or Settings → MCP Servers |
 | **Cursor** | Settings → MCP Servers |
 | **Claude Desktop** | `claude_desktop_config.json` |
 | **Claude Code** | `claude_code_config.json` or `--mcp-config` flag |
 
+Done. Your agent now has access to the full protocol, pattern registry, and validation gates.
+
+### 2. Bootstrap to your project (optional)
+
+Run the `bootstrap` prompt so the agent scans your codebase and populates protocol files with your real commands, architecture layers, and stack info.
+
+### 3. Scaffold files for offline use (optional)
+
+Use the `init` tool to write protocol files directly into your repo:
+
+```
+Use the sync_loop init tool — choose: copilot, cursor, claude, or all
+```
+
+This generates agent definitions, instruction files, and a canonical `.agent-loop/` folder with the full protocol. Useful for CI, offline work, or customization.
+
 ---
 
-## How the Agent Loop Works
+## Use Cases
 
-Every agent turn runs the same 7-stage loop — no shortcuts:
+### "Fix this bug without breaking anything else"
+
+The agent reads the codebase first (SENSE), pulls only the relevant constraints (GKP), patches the root cause (DECIDE+ACT), then runs type checks + test gates + neighbor checks in a loop until everything passes (CHALLENGE-TEST). If the same fix fails 3 times, it's pruned and the agent tries a different approach.
+
+### "Refactor this module safely"
+
+Pattern R1 kicks in: the agent plans the moves, executes them, validates all imports and cross-module contracts, and documents what changed. It won't mix refactoring with feature changes in the same patch.
+
+### "Add an API endpoint"
+
+Patterns R3 (API contracts) and P5 (transport routes) route the agent to use typed request/response models, proper error envelopes, and enforce that no business logic leaks into the route handler.
+
+### "This session is getting long and the agent is getting confused"
+
+SyncLoop compresses context after each successful cycle (State Collapse) and discards raw history. Only a compact checkpoint enters the next turn. The agent stays sharp instead of degrading.
+
+### "I want to plan work but not implement it yet"
+
+The REPORT stage routes investigations to `docs/backlog/` as structured task files with priority, Action Plan, and acceptance criteria — separate from completed-work reports in `docs/reports/`.
+
+---
+
+## The 7-Stage Loop
+
+Every turn follows this sequence — no shortcuts, no skipped stages:
 
 ```
 SENSE → GKP → DECIDE+ACT → CHALLENGE-TEST → UPDATE → LEARN → REPORT
 ```
 
-### Stage by stage
+| Stage | What the agent does |
+|-------|---------------------|
+| **SENSE** | Reads codebase state, identifies gaps, won't proceed until context is sufficient |
+| **GKP** | Routes through pattern registry, pulls only relevant constraints, compresses context |
+| **DECIDE+ACT** | Selects mode (stabilize / fix / decompose), produces plan, executes immediately |
+| **CHALLENGE-TEST** | Runs ENV gates (types, tests, layers) + NEIGHBOR gates (shapes, boundaries) in a loop |
+| **UPDATE** | Commits state transitions — files changed, contracts updated |
+| **LEARN** | Persists lessons to pattern tables for future turns |
+| **REPORT** | Writes a report (completed work) or backlog task (deferred work) or skips (trivial) |
 
-**1. SENSE**
-Before touching any code, the agent reads the current codebase state and identifies:
-- what needs to change
-- what could break
-- what context is still missing
-
-It will not proceed until it has enough information to act safely.
-
-**2. GKP — Generated Knowledge Pack**
-The agent routes through a pattern registry to pull only the constraints, risks, and implementation
-examples relevant to this specific task. Raw files are not carried forward — only a compressed,
-task-scoped context bundle is produced.
-
-**3. DECIDE + ACT**
-The agent selects one of three operational modes and executes immediately:
-
-| Mode | When | What the agent does |
-|------|------|---------------------|
-| **INTACT-STABILIZE** | System is healthy | Harden types, add tests, improve docs |
-| **BROKEN-EXPAND** | Something is broken | Patch the root cause with minimal surface area |
-| **OVERDENSE-SPLIT** | Code is too complex | Decompose before adding anything new |
-
-Plan and action happen in the same step — no plans without execution.
-
-**4. CHALLENGE-TEST**
-Two validation gates run in a loop until everything passes or the retry budget runs out (max 5):
-
-1. **ENV gate** — type safety, test coverage, layer integrity, complexity thresholds, debug hygiene
-2. **NEIGHBOR gate** — shape compatibility across modules, boundary exports, cross-module contracts
-
-Failures are classified before any fix is attempted:
-
-| Class | Signal | What happens |
-|-------|--------|--------------|
-| **Micro** | Error text directly explains fix (missing return type, stray `print()`) | Fixed in-place, no budget consumed |
-| **Macro** | Root cause needs diagnosis (test failure, layer violation) | Patch cycle runs, consumes 1 of 5 retries |
-
-If the same failure recurs 3 times, the approach is pruned and the agent re-enters planning
-with a hardcoded constraint against repeating it. If it was already pruned once, the agent escalates.
-
-**5. UPDATE**
-Once all gates pass, state transitions are committed: changed files, updated contracts, modified patterns.
-
-**6. LEARN**
-Lessons from the cycle are persisted so they carry into future turns:
-- Quick fix → added as a row in the auto-fixes or common errors table
-- New reusable approach → written into the matching pattern spec
-
-**7. REPORT**
-Non-trivial tasks produce a structured session summary: what changed, which gates passed, what was learned.
-Skipped for trivial one-liners.
+**Self-correction:** Test failures and layer violations trigger a patch → retry loop (max 5). Trivial issues (missing type, stray debug call) are fixed in-place without consuming retries. Same failure 3× → approach pruned, lesson injected, agent re-plans.
 
 ---
 
-## Context Compaction
+## What Gets Scaffolded
 
-Long coding sessions degrade agent quality when too much raw context accumulates.
-SyncLoop actively manages this with two strategies:
+| Target | Files generated |
+|--------|----------------|
+| `copilot` | `.agent-loop/` + `.github/copilot-instructions.md` + `.github/instructions/*.instructions.md` + `.github/agents/SyncLoop*.agent.md` + `.github/skills/diagnose-failure/SKILL.md` |
+| `cursor` | `.agent-loop/` + `.cursor/rules/*.md` |
+| `claude` | `.agent-loop/` + `CLAUDE.md` + `.claude/rules/*.md` + `.claude/agents/SyncLoop*.md` + `.claude/skills/diagnose-failure/SKILL.md` |
+| `all` | All of the above + `AGENTS.md` + `docs/backlog/index.md` |
 
-**State Collapse — after a successful cycle**
-Everything is summarised into a compact checkpoint. Only that checkpoint enters the next SENSE stage.
-Raw history is discarded.
+**Agents scaffolded** (Copilot + Claude):
+- **SyncLoop** — Full 7-stage protocol agent
+- **SyncLoop-Architect** — Read-only planning agent (SENSE → GKP → DECIDE+ACT only)
+- **SyncLoop-Fixer** — Implementation agent (CHALLENGE-TEST → UPDATE → LEARN)
 
-**Branch Pruning — on repeated failure**
-When the same error recurs 3 times, the failing approach is reverted and a constraint is recorded:
-"do not retry approach X". The agent re-enters DECIDE with that lesson injected.
-
-This keeps the agent sharp in long sessions instead of degrading.
-
----
-
-## Pattern System
-
-SyncLoop routes implementation decisions through a structured registry rather than letting the agent free-associate.
-
-### Pattern families
-
-| ID | What it covers |
-|----|----------------|
-| **P1–P11** | Port/adapter, domain modules, background tasks, transport routes, dependency injection, typed models, enum safety, error handling, type hints, service orchestration, config isolation |
-| **R1** | 4-phase safe refactoring: plan → execute → validate → document |
-| **R2** | Full test pyramid: unit, integration, API — fixtures, factories, mocks, naming conventions |
-| **R3** | API boundary contracts: typed request/response models, error envelopes, versioning |
-
-### How pattern routing works
-
-Inside GKP, the agent:
-1. Scans pattern triggers (`"Use when: moving a file"`, `"Use when: adding an endpoint"`)
-2. Routes to the matching spec
-3. Extracts constraints and examples for the active task only
-4. Checks learned tables for known pitfalls and auto-fixes
-5. Compresses to a minimal action context
-
-This makes decisions consistent across the session and prevents architecture drift.
+**Skills scaffolded:**
+- **diagnose-failure** — Failure diagnosis using the FEEDBACK loop
 
 ---
 
-## Testing Approach
+## MCP Server Reference
 
-Tests are run in order: changed files first → adjacent modules → full suite.
-The agent never modifies tests to make them pass. If a test fails, the source is fixed.
-
-**Failure handling:**
-- Missing return types, stray debug calls → fixed inline, no retry budget spent
-- Real test failures or layer violations → root-cause diagnosis → targeted patch → retry gate
-
-**Test pyramid targets:** ≥70% unit, ≤20% integration, ≤10% API.
-
----
-
-## Guardrails
-
-The agent is hardcoded never to:
-
-- Modify tests to force them green
-- Remove type annotations to silence type errors
-- Bypass architecture layer boundaries
-- Change public APIs or contracts without explicit user approval
-- Mix refactoring with feature changes in the same patch
-- Skip validation after refactors, import moves, or interface changes
-
-If any of these are required to proceed, the agent stops and escalates.
-
----
-
-## What the MCP server exposes
-
-### Resources
-
-All protocol docs are served on-demand — the agent pulls only what it needs per stage.
+### Resources (on-demand protocol docs)
 
 | Resource | Content |
 |----------|---------|
-| `reasoning-kernel` | Full 7-stage loop, transition map, stage details, context clearage |
-| `feedback` | Failure diagnosis, patch contract, micro-loop, branch pruning, learning |
-| `validate-env` | Stage 1 gates: types, tests, layers, complexity, debug hygiene |
-| `validate-n` | Stage 2 gates: shape compatibility, boundaries, bridge contracts |
-| `patterns` | Pattern routing index, GKP table, auto-fixes, heuristics, pruning records |
-| `glossary` | Canonical domain terminology and naming rules |
-| `code-patterns` | P1–P11 implementation patterns with examples |
-| `testing-guide` | Full test strategy: pyramid, fixtures, factories, mocks, parametrize |
-| `refactoring-workflow` | 4-phase refactoring checklist |
-| `api-standards` | Boundary contracts: typed models, error envelopes, versioning |
-| `protocol-summary` | Condensed ~50-line overview for system-prompt injection |
+| `reasoning-kernel` | Full 7-stage loop, transition map, context clearage |
+| `feedback` | Failure diagnosis, patch protocol, branch pruning |
+| `validate-env` | Stage 1: types, tests, layers, complexity, debug hygiene |
+| `validate-n` | Stage 2: shapes, boundaries, bridge contracts |
+| `patterns` | Pattern routing index, auto-fixes, heuristics |
+| `code-patterns` | P1–P11 implementation patterns |
+| `testing-guide` | Test pyramid, fixtures, factories, mocks |
+| `refactoring-workflow` | 4-phase safe refactoring checklist |
+| `api-standards` | Boundary contracts, typed models, error envelopes |
+| `glossary` | Domain terminology and naming rules |
+| `protocol-summary` | Condensed ~50-line overview |
 | `agents-md` | AGENTS.md entrypoint template |
 | `overview` | File index and framework overview |
 
@@ -216,30 +158,8 @@ All protocol docs are served on-demand — the agent pulls only what it needs pe
 
 | Prompt | Description |
 |--------|-------------|
-| `bootstrap` | Wire SyncLoop to your actual project — scans codebase, populates real commands and architecture |
+| `bootstrap` | Scan your codebase and wire SyncLoop to your real architecture |
 | `protocol` | Condensed protocol for direct system-prompt injection |
-
----
-
-## Optional: scaffold files into your project
-
-For offline use, CI, or customisation, the full protocol can be written into your repo:
-
-```
-Use the sync_loop init tool — choose: copilot, cursor, claude, or all
-```
-
-| Target | Files generated |
-|--------|----------------|
-| `copilot` | `.agent-loop/` + `.github/copilot-instructions.md` + `.github/instructions/*.instructions.md` |
-| `cursor` | `.agent-loop/` + `.cursor/rules/*.md` with frontmatter |
-| `claude` | `.agent-loop/` + `CLAUDE.md` + `.claude/rules/*.md` |
-| `all` | All of the above + `AGENTS.md` |
-
-After scaffolding, use the `bootstrap` prompt so the agent scans your codebase and populates
-the generated files with real validation commands, architecture layers, and module boundaries.
-
-Platform instruction files are lightweight wrappers that delegate to `.agent-loop/*` canonical docs.
 
 ---
 
@@ -250,17 +170,6 @@ npm install
 npm run typecheck
 npm test
 ```
-
-`npm test` runs a full TypeScript build first, then executes the automated test suite.
-
-### Publish to npm (public)
-
-```bash
-npm run publish:public:dry-run
-npm run publish:public
-```
-
----
 
 ## License
 

@@ -48,6 +48,7 @@ function createDeps(): { deps: CliDeps; calls: { startServer: number; initArgs: 
     startServerFn: async () => {
       calls.startServer += 1;
     },
+    waitForStdinFn: async () => 0,
   };
 
   return { deps, calls };

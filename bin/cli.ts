@@ -57,6 +57,7 @@ export interface CliDeps {
   detectStacksFn: (projectPath: string) => StackDefinition[];
   initFn: typeof init;
   startServerFn: () => Promise<unknown>;
+  waitForStdinFn: () => Promise<number>;
 }
 
 function defaultIo(): CliIo {
@@ -72,6 +73,10 @@ function defaultDeps(): CliDeps {
     detectStacksFn: detectStacks,
     initFn: init,
     startServerFn: startServer,
+    waitForStdinFn: () => new Promise((resolve) => {
+      process.stdin.on("end", () => resolve(0));
+      process.stdin.on("close", () => resolve(0));
+    }),
   };
 }
 
@@ -156,7 +161,9 @@ export async function runCli(
   }
 
   await deps.startServerFn();
-  return 0;
+  
+  // Keep the process alive until stdin is closed by the parent process.
+  return deps.waitForStdinFn();
 }
 
 function isMainModule(metaUrl: string): boolean {
