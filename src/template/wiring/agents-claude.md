@@ -112,7 +112,19 @@ Mode selected in DECIDE+ACT. Can change after each validation cycle.
 4. **CHALLENGE-TEST** — Run `validate-env.md` then `validate-n.md`. Classify failures (see below). Loop until pass or budget exhausted.
 5. **UPDATE** — Commit state transitions. If new issue found → one more CHALLENGE-TEST pass.
 6. **LEARN** — Persist: quick fix → `patterns.md` table; deep pattern → `patterns/{spec}.md`; new term → `glossary.md`.
-7. **REPORT** — Write `docs/reports/YYYY-MM-DD-{slug}.md` for non-trivial work. Skip for single-file cosmetic fixes.
+7. **REPORT** — Route output: implemented + multi-file → `docs/reports/`; planned but not implemented → `docs/backlog/`; trivial → skip.
+
+### Report vs Backlog Routing
+
+```
+Work implemented this session?
+├─ YES + multi-file or architecture change → write docs/reports/YYYY-MM-DD-{slug}.md
+├─ YES + single-file cosmetic/docs-only    → skip
+├─ NO  + investigation/plan produced       → write docs/backlog/YYYY-MM-DD-{slug}.md + update index
+└─ NO  + trivial lookup/question           → skip
+```
+
+Reports = completed work. Backlog tasks = planned but unexecuted work. Never create both for the same task.
 
 ### Failure Classification
 
@@ -186,7 +198,7 @@ LEARN
 [what was persisted to patterns.md or patterns/*.md]
 
 REPORT
-[docs/reports/YYYY-MM-DD-{slug}.md — or "skipped (trivial)"]
+[docs/reports/YYYY-MM-DD-{slug}.md | docs/backlog/YYYY-MM-DD-{slug}.md — or "skipped (trivial)"]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 

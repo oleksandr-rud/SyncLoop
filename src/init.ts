@@ -416,6 +416,18 @@ function generatePlatformFiles(
     const agentBody = applyStacks(readTemplate("wiring/agents-github.md"), stacks);
     const agentResult = writeOutput(projectPath, ".github/agents/SyncLoop.agent.md", agentBody, options);
     results.push(`  ${formatWriteResult(agentResult)}`);
+
+    const architectBody = applyStacks(readTemplate("wiring/agents-github-architect.md"), stacks);
+    const architectResult = writeOutput(projectPath, ".github/agents/SyncLoop-Architect.agent.md", architectBody, options);
+    results.push(`  ${formatWriteResult(architectResult)}`);
+
+    const fixerBody = applyStacks(readTemplate("wiring/agents-github-fixer.md"), stacks);
+    const fixerResult = writeOutput(projectPath, ".github/agents/SyncLoop-Fixer.agent.md", fixerBody, options);
+    results.push(`  ${formatWriteResult(fixerResult)}`);
+
+    const diagnoseFailureBody = applyStacks(readTemplate("wiring/skills-diagnose-failure.md"), stacks);
+    const diagnoseFailureResult = writeOutput(projectPath, ".github/skills/diagnose-failure/SKILL.md", diagnoseFailureBody, options);
+    results.push(`  ${formatWriteResult(diagnoseFailureResult)}`);
   } else if (platform === "cursor") {
     const frontmatter = yamlFrontmatter({ description: "SyncLoop protocol summary and guardrails", alwaysApply: true });
     const writeResult = writeOutput(projectPath, ".cursor/rules/00-protocol.md", `${frontmatter}\n\n${summary}`, options);
@@ -427,6 +439,18 @@ function generatePlatformFiles(
     const agentBody = applyStacks(readTemplate("wiring/agents-claude.md"), stacks);
     const agentResult = writeOutput(projectPath, ".claude/agents/SyncLoop.md", agentBody, options);
     results.push(`  ${formatWriteResult(agentResult)}`);
+
+    const architectBody = applyStacks(readTemplate("wiring/agents-claude-architect.md"), stacks);
+    const architectResult = writeOutput(projectPath, ".claude/agents/SyncLoop-Architect.md", architectBody, options);
+    results.push(`  ${formatWriteResult(architectResult)}`);
+
+    const fixerBody = applyStacks(readTemplate("wiring/agents-claude-fixer.md"), stacks);
+    const fixerResult = writeOutput(projectPath, ".claude/agents/SyncLoop-Fixer.md", fixerBody, options);
+    results.push(`  ${formatWriteResult(fixerResult)}`);
+
+    const diagnoseFailureBody = applyStacks(readTemplate("wiring/skills-diagnose-failure.md"), stacks);
+    const diagnoseFailureResult = writeOutput(projectPath, ".claude/skills/diagnose-failure/SKILL.md", diagnoseFailureBody, options);
+    results.push(`  ${formatWriteResult(diagnoseFailureResult)}`);
   }
 
   return results;
@@ -493,6 +517,10 @@ export function init(
   const agentsContent = applyStacks(readTemplate("AGENTS.md"), effectiveStacks);
   const agentsResult = writeOutput(root, "AGENTS.md", agentsContent, mergedOptions);
   results.push(`AGENTS.md (cross-platform entrypoint: ${formatWriteResult(agentsResult)})`);
+
+  const backlogContent = readTemplate("backlog-index.md");
+  const backlogResult = writeOutput(root, "docs/backlog/index.md", backlogContent, { ...mergedOptions, overwrite: false });
+  results.push(`docs/backlog/index.md (${formatWriteResult(backlogResult)})`);
 
   const targets: Exclude<InitTarget, "all">[] = target === "all"
     ? ["copilot", "cursor", "claude"]

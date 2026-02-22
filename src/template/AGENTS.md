@@ -147,11 +147,40 @@ If uncertain, choose isolated and reversible changes.
 
 ---
 
-## 9. Reporting & Artifacts
+## 9. Reporting, Backlog & Artifacts
 
-- Reports: `docs/reports/YYYY-MM-DD-{slug}.md`
+The REPORT stage (stage 7) produces exactly one of three outcomes per task:
+
+```
+Work implemented this session?
+├─ YES + multi-file or architecture change → REPORT
+├─ YES + single-file cosmetic/docs-only    → SKIP
+├─ NO  + investigation/plan produced       → BACKLOG TASK
+└─ NO  + trivial lookup/question           → SKIP
+```
+
+**Key rule:** Reports record **completed work**. Backlog tasks record **planned but unexecuted work**. Never create both for the same task.
+
+### Reports (completed work)
+
+- Path: `docs/reports/YYYY-MM-DD-{slug}.md`
 - Artifacts: `docs/reports/artifacts/`
-- Learning memory: `.agent-loop/patterns.md` and `.agent-loop/patterns/*.md`
+- Trigger: implementation was done this session AND touched ≥2 files or changed architecture/patterns
+- Contents: summary, scope, changes, verification results, learned patterns
 
-Create reports for non-trivial work (multi-file refactor, root-cause fix, architecture change).
+### Backlog (planned but deferred work)
+
+- Index: `docs/backlog/index.md` — priority-sorted table with task state
+- Tasks: `docs/backlog/YYYY-MM-DD-{slug}.md` — one file per task
+- Trigger: investigation or planning was done BUT implementation was NOT executed (needs approval, requires decomposition, lower priority, blocked on dependency)
+- Contents: context, Action Plan, acceptance criteria, priority (P0–P3), dependencies
+- After creating a task file, add a row to `docs/backlog/index.md`
+- When a backlog task is later implemented, mark it `done` in the index and write a report for that session
+
+### Learning Memory
+
+- `.agent-loop/patterns.md` and `.agent-loop/patterns/*.md`
+- Updated during LEARN (stage 6), independent of report/backlog routing
+
+Full decision tree and templates: see [reasoning-kernel.md § REPORT](.agent-loop/reasoning-kernel.md).
 

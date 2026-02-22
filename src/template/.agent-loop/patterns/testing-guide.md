@@ -7,187 +7,84 @@ Referenced from [../patterns.md](../patterns.md).
 
 ## Test Organization
 
-```
-tests/
-├── conftest.py          # Shared fixtures, global setup
-├── factories.py         # Test data builders
-├── mocks.py             # Mock implementations for external deps
-├── api/                 # API/endpoint tests (HTTP client)
-├── integration/         # Multi-component workflow tests
-└── unit/                # Pure logic tests (no I/O)
-```
+Organize tests into a top-level `tests/` directory with clear separation:
+
+| Directory | Purpose |
+|-----------|---------|
+| `tests/conftest` or `tests/helpers` | Shared fixtures, global setup |
+| `tests/factories` | Test data builders |
+| `tests/mocks` | Mock implementations for external dependencies |
+| `tests/api/` | API/endpoint tests (HTTP client) |
+| `tests/integration/` | Multi-component workflow tests |
+| `tests/unit/` | Pure logic tests (no I/O) |
 
 ---
 
 ## Pattern 1: Fixture-Based Setup
 
-```python
-# Environment isolation — reset global state each test
-@pytest.fixture(autouse=True)
-def reset_context():
-    """Reset global state before each test."""
-    import app.context
-    app.context._context = None
-    yield
-    app.context._context = None
+Define reusable **fixtures** (setup/teardown helpers) that isolate test state:
 
-# Test app configuration
-@pytest.fixture
-def test_app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    """Configure app with test-safe environment."""
-    monkeypatch.setenv("APP_ENV", "testing")
-    monkeypatch.setenv("ENABLE_BACKGROUND_TASKS", "0")
-    yield create_app()
+- **Environment isolation fixture**: resets any module-level singletons or global state before and after each test. Ensures one test cannot leak state into another.
+- **Test app fixture**: configures the application with test-safe environment variables (e.g., test database URL, disabled background tasks) and yields a configured app instance.
+- **Client fixture**: wraps the test app in an HTTP test client for endpoint-level tests.
 
-# API client for endpoint tests
-@pytest.fixture
-def client(test_app):
-    return TestClient(test_app)
-```
+Each fixture is scoped to the narrowest lifecycle needed — per-test for state resets, per-session for expensive resources like database connections.
 
 ---
 
 ## Pattern 2: Factory Pattern for Test Data
 
-```python
-class EntityFactory:
-    @staticmethod
-    def create(
-        id: str | None = None,
-        name: str = "Test Entity",
-        entity_type: str = "default",
-        **extras: Any,
-    ) -> dict[str, Any]:
-        return {
-            "id": id or str(uuid4()),
-            "name": name,
-            "metadata": {"type": entity_type, **extras},
-        }
+Create a **factory class** (or set of builder functions) that produces valid test entities with sensible defaults. Each factory method accepts optional overrides via keyword arguments so tests only specify the fields relevant to the scenario.
 
-    @staticmethod
-    def with_full_analysis() -> dict[str, Any]:
-        """Semantic constructor for entity with all analysis fields populated."""
-        return EntityFactory.create(
-            name="Fully Analyzed Entity",
-            entity_type="analyzed",
-            score=85.0,
-            grade="B",
-        )
-```
+Provide **semantic constructors** — named factory methods like `with_full_analysis()` or `as_admin_user()` — that configure the entity for a specific test scenario. This makes test setup self-documenting and avoids duplicated setup logic across test files.
 
 ---
 
 ## Pattern 3: Mock External Dependencies
 
-```python
-class MockExternalService:
-    """Mock for any external service boundary (LLM, API, storage)."""
-    def __init__(self, response: dict | str | None = None):
-        self.response = response or self._default_response()
-        self.calls: list[dict] = []
+Define a **mock class** for each external boundary (LLM, HTTP API, storage backend, message queue). The mock:
 
-    async def __call__(self, prompt: str, context: str, **kwargs):
-        self.calls.append({"prompt": prompt, "context": context})
-        return json.dumps(self.response), {}
+- Accepts a configurable response via its constructor
+- Records every call (arguments, timestamps) in an internal list
+- Returns the configured response on each invocation
+- Exposes a `call_count` property for verification
 
-    @property
-    def call_count(self) -> int:
-        return len(self.calls)
-```
-
-Usage:
-```python
-@pytest.fixture
-def mock_service() -> MockExternalService:
-    return MockExternalService(response={"score": 85})
-
-def test_analysis_delegates_to_service(mock_service):
-    service = AnalysisService(external=mock_service)
-    result = service.analyze(...)
-    assert mock_service.call_count == 1
-```
+Tests inject the mock via fixture, replacing the real dependency. After the test action, assertions verify both the result and the mock's call history.
 
 ---
 
 ## Pattern 4: Class-Based Test Organization
 
-```python
-class TestParseResponse:
-    def test_valid_json_response(self):
-        response = '{"entity_type": "analyzed", "score": 85}'
-        result = parse_response(response)
-        assert result.entity_type == EntityType.ANALYZED
-
-    def test_invalid_json_fallback(self):
-        result = parse_response("Not JSON")
-        assert result.entity_type == EntityType.UNKNOWN
-
-    def test_missing_fields_use_defaults(self):
-        result = parse_response('{"entity_type": "analyzed"}')
-        assert result.score == 0.0
-```
+Group related test cases into a **test class** named after the unit under test (e.g., `TestParseResponse`, `TestOrderService`). Each method within the class tests one behavior: happy path, error path, edge case, or default behavior. The class name provides namespace grouping in test runner output.
 
 ---
 
 ## Pattern 5: Parametrized Tests
 
-```python
-@pytest.mark.parametrize("score,expected_grade", [
-    (95, "A"), (90, "A"),
-    (89.9, "B"), (85, "B"), (80, "B"),
-    (79, "C"), (70, "C"),
-    (69, "D"), (60, "D"),
-    (59, "F"), (0, "F"),
-])
-def test_grade_thresholds(score: float, expected_grade: str):
-    assert compute_grade(score) == expected_grade
-```
+Use the test framework's **parametrize** mechanism to run one test function across multiple input/output pairs. Define the parameter sets as a list of tuples — each tuple contains the input values and the expected outcome. This eliminates repetitive test methods for boundary-value or threshold logic.
 
 ---
 
 ## Pattern 6: Three-Layer Test Strategy
 
-```python
-# UNIT: Pure logic, no I/O
-def test_parse_response():
-    result = parse_response('{"entity_type": "analyzed"}')
-    assert result.entity_type == EntityType.ANALYZED
+Structure tests into three layers with distinct characteristics:
 
-# INTEGRATION: Multiple components, mocked external I/O
-def test_analysis_pipeline(mock_service, mock_repository):
-    service = AnalysisService(external=mock_service, repo=mock_repository)
-    report = service.analyze(entities=[...])
-    assert report.aggregate_score > 0
-
-# API: HTTP endpoint, full stack with test client
-def test_analyze_endpoint(client, mock_data):
-    response = client.post("/api/v1/analyze", json=mock_data)
-    assert response.status_code == 200
-    assert "score" in response.json()
-```
+- **Unit tests**: Pure logic, no I/O, no external dependencies. Test a single function or class method in isolation. Fast (< 10ms each).
+- **Integration tests**: Multiple components wired together, external I/O mocked at the boundary. Test that services, repositories, and adapters compose correctly.
+- **API tests**: Full HTTP request/response cycle through a test client. Verify status codes, response shapes, and error envelopes.
 
 ---
 
 ## Pattern 7: Assertion Patterns
 
-```python
-# ✅ Specific property checks
-assert report.task_id == "task-1"
-assert len(report.metrics) > 0
-assert "total_items" in [m.name for m in report.metrics]
+Write assertions that verify **specific properties**, not just truthiness:
 
-# ✅ Range/constraint checks
-assert 0 <= result.score <= 100
-assert result.entity_type in EntityType
+- Check exact field values on result objects
+- Verify collection lengths and membership
+- Use range/constraint assertions (value within expected bounds, enum membership)
+- Assert on collection-wide properties (all items satisfy a predicate, at least one item matches)
 
-# ✅ Collection checks
-assert all(m.value >= 0 for m in report.metrics)
-assert any(r.entity_type == "analyzed" for r in results)
-
-# ❌ Vague — what is being verified?
-assert report
-assert result is not None
-```
+Avoid vague assertions like "result is not None" or bare truthiness checks — they pass on wrong data.
 
 ---
 
@@ -195,14 +92,13 @@ assert result is not None
 
 Format: `test_<action>_<condition>_<outcome>`
 
-```
-test_returns_report                      # Basic happy path
-test_metrics_computed_correctly          # Specific behavior
-test_unknown_type_falls_back_to_default  # Edge case
-test_invalid_json_fallback               # Error handling
-test_missing_fields_use_defaults         # Default behavior
-test_empty_input_returns_empty_report    # Boundary condition
-```
+Examples:
+- `test_returns_report` — basic happy path
+- `test_metrics_computed_correctly` — specific behavior
+- `test_unknown_type_falls_back_to_default` — edge case
+- `test_invalid_json_fallback` — error handling
+- `test_missing_fields_use_defaults` — default behavior
+- `test_empty_input_returns_empty_report` — boundary condition
 
 ---
 
@@ -237,16 +133,7 @@ test_empty_input_returns_empty_report    # Boundary condition
 2. **Adjacent modules second** — run tests for callers/consumers
 3. **Full suite last** — once local confidence is high, run everything
 
-```bash
-# Targeted
-pytest tests/unit/test_processor.py -x -v
-
-# Adjacent
-pytest tests/unit/ tests/integration/ -x -v -k "processor or analysis"
-
-# Full suite
-pytest tests/ -x -v
-```
+Use the project's test runner with verbose and fail-fast flags. Filter by keyword or path to target specific modules during iterative development.
 
 ---
 

@@ -9,34 +9,11 @@ Referenced from [../patterns.md](../patterns.md).
 
 Abstracts infrastructure behind protocol interfaces. Decouples domain logic from external systems.
 
-```python
-# Port (interface/protocol)
-class StoragePort(Protocol):
-    def search(
-        self,
-        collection: str,
-        query: str,
-        *,
-        filters: dict | None = None,
-        limit: int = 10,
-    ) -> list[Record]: ...
+Define a **Port** as an interface (or protocol/trait) that declares the operations a service needs — method names, parameter types, and return types — without any implementation details. The Port belongs to the domain layer and knows nothing about databases, HTTP, or file systems.
 
-# Adapter (concrete implementation)
-class DatabaseAdapter:
-    def __init__(self, client: DBClient) -> None:
-        self._client = client
+Create an **Adapter** as a concrete class that implements the Port interface. Each adapter encapsulates the specifics of one external system (a database client, an HTTP API, a message queue). Multiple adapters can satisfy the same port.
 
-    def search(
-        self,
-        collection: str,
-        query: str,
-        *,
-        filters: dict | None = None,
-        limit: int = 10,
-    ) -> list[Record]:
-        # Implementation against real infrastructure
-        ...
-```
+Services receive the port interface via constructor injection, never the adapter directly.
 
 **Key rules:**
 - Port lives in `libs/{component}/port.*`
@@ -56,17 +33,11 @@ Each domain module follows a consistent multi-file layout:
 | `routes.*` | Transport endpoints |
 | `tasks.*` | Background tasks (if async processing needed) |
 
-```python
-# services.py — business logic only, no transport concerns
-class OrderService:
-    def __init__(self, repository: OrderRepository) -> None:
-        self._repository = repository
+The **models** file defines data structures (classes, structs, or types) representing the core domain — entities with identity, value objects without identity, and any associated enums or constants.
 
-    def process(self, *, order_id: str) -> ProcessResult:
-        order = self._repository.get(order_id)
-        # business logic here
-        return ProcessResult(order_id=order.id, status="completed")
-```
+The **services** file contains business logic: methods that operate on models, enforce invariants, and coordinate between ports. Services never reference transport or serialization concerns.
+
+The **routes** file is the transport boundary — HTTP handlers, CLI entry points, or message consumers. Routes parse input, delegate to a service, and format the response. No business logic lives here.
 
 ---
 
@@ -74,219 +45,80 @@ class OrderService:
 
 Task handlers stay thin. Business logic always lives in services.
 
-```python
-# tasks.py — thin wrapper, delegates to service
-def process_order_task(runtime: TaskRuntime, order_id: str):
-    """Background task that delegates to service."""
-    service = runtime.order_service
-    service.update_status(order_id, status="processing")
-
-    try:
-        service.process(order_id=order_id)
-        service.update_status(order_id, status="completed")
-    except Exception as exc:
-        service.update_status(order_id, status="failed", error=str(exc))
-        raise
-```
+A task handler is a function or method invoked by a job queue or scheduler. It receives a runtime context (containing pre-wired service instances) and the task payload. The handler calls the appropriate service method, updates task status on success and failure, and re-raises exceptions for the queue's retry mechanism.
 
 **Key rules:**
 - Tasks never contain business logic
-- Dependencies injected via runtime, not imported directly
-- Always update status on success and failure
+- Dependencies injected via runtime context, not imported directly
+- Always update status on both success and failure paths
 
 ---
 
 ## P4 · App Context / Composition Root
 
-Centralized dependency wiring, initialized once at startup:
+Centralized dependency wiring, initialized once at startup.
 
-```python
-@dataclass
-class AppContext:
-    config: Config
-    session_factory: SessionFactory
-    services: ServiceRegistry
-    logger: Logger
-
-_context: AppContext | None = None
-
-def init_app_context(config: Config) -> AppContext:
-    global _context
-    if _context:
-        return _context
-    _context = AppContext(config=config, ...)
-    return _context
-
-def get_app_context() -> AppContext:
-    if _context is None:
-        return init_app_context(load_config())
-    return _context
-```
+Define an **AppContext** as a container (class or struct) holding all application-wide dependencies: configuration, database session factories, service registries, and loggers. A factory function creates the context once during startup, caching it as a module-level singleton. All subsequent access goes through a getter that returns the cached instance. This ensures consistent wiring and makes the full dependency graph visible in one place.
 
 ---
 
 ## P5 · Transport Route
 
-Routes only handle transport concerns; all logic delegated to services:
+Routes only handle transport concerns; all logic delegated to services.
 
-```python
-router = APIRouter()
-
-def get_service() -> OrderService:
-    ctx = get_app_context()
-    return OrderService(ctx.repository)
-
-@router.post("/orders")
-def create_order(
-    data: CreateOrderRequest,
-    service: OrderService = Depends(get_service),
-) -> OrderResponse:
-    result = service.create(data)
-    return OrderResponse(id=result.id, status=result.status)
-```
+A route handler performs three steps: (1) parse and validate the incoming request into a typed model, (2) resolve the appropriate service instance via dependency injection, and (3) call the service method and map the result to a typed response model. The handler never contains conditionals, loops, or data transformations beyond serialization.
 
 ---
 
 ## P6 · Typed Models
 
-Domain entities with explicit types and serialization:
+Domain entities with explicit types and serialization.
 
-```python
-@dataclass(slots=True)
-class OrderItem:
-    product_id: str
-    quantity: int
-    unit_price: float
-    tags: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "product_id": self.product_id,
-            "quantity": self.quantity,
-            "unit_price": self.unit_price,
-            "tags": self.tags,
-        }
-```
+Every data structure that crosses a boundary (API request, API response, database row, message payload) must be a typed model — a class, struct, or schema with named fields and declared types. Each model provides a serialization method (to dictionary, JSON, or equivalent) for transport. Use slot-based or frozen classes where the language supports them to prevent accidental mutation.
 
 ---
 
 ## P7 · Collection/Enum Safety
 
-Replace magic strings with typed enums:
+Replace magic strings with typed enums.
 
-```python
-class Collection(str, Enum):
-    ORDERS = "orders"
-    PRODUCTS = "products"
-    USERS = "users"
-
-# Usage: repository.query(Collection.ORDERS, ...)
-# NOT: repository.query("orders", ...)
-```
+Define an enum (or string enum / literal union) for any fixed set of values: collection names, status codes, category labels, entity types. All code references the enum member, never a raw string. This centralizes valid values in one declaration and makes invalid states unrepresentable.
 
 ---
 
 ## P8 · Error Handling
 
-Layered exception hierarchy with boundary translation:
+Layered exception hierarchy with boundary translation.
 
-```python
-# Domain exceptions
-class DomainError(Exception):
-    """Base error for domain."""
-
-class NotFoundError(DomainError):
-    """Resource not found."""
-
-class ValidationError(DomainError):
-    """Invalid input or state."""
-
-# Route-level translation
-@router.get("/orders/{order_id}")
-def get_order(order_id: str, service = Depends(get_service)):
-    try:
-        return service.get(order_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-```
+Define a base domain exception class. Derive specific exceptions from it: `NotFoundError`, `ValidationError`, `ConflictError`, etc. Business logic raises domain exceptions only. At the transport boundary (route handler), catch domain exceptions and translate them to the appropriate HTTP status codes or error responses. Internal implementation errors (unexpected crashes) propagate to a global handler that returns a generic 500-level response.
 
 ---
 
 ## P9 · Type Hints Everywhere
 
-All code must have complete type annotations:
+All code must have complete type annotations.
 
-```python
-# ✅ Good — fully typed
-def process(
-    order_id: str,
-    *,
-    callback: Callable[..., Awaitable[Response]] | None = None,
-) -> tuple[str, dict[str, Any]] | None:
-    ...
-
-# ❌ Bad — missing annotations
-def process(order_id, callback=None):
-    ...
-```
-
-**Common type aliases:**
-```python
-SessionFactory = Callable[[], Session]
-Filters = Mapping[str, Any]
-```
+Every function signature declares parameter types and return type. Use union types for nullable values. Use generic types for collections. Define type aliases for complex or repeated signatures (e.g., a factory callable, a filter mapping). Avoid `any` / untyped containers. The type checker must pass with zero errors on every commit.
 
 ---
 
 ## P10 · Service Orchestration
 
-Services accept all dependencies via constructor — no hidden state:
+Services accept all dependencies via constructor — no hidden state.
 
-```python
-# Production code
-class AnalysisService:
-    def __init__(
-        self,
-        repository: Repository,
-        evaluator: EvaluationService,
-    ):
-        self._repository = repository
-        self._evaluator = evaluator
-
-# Test code — inject mocks
-service = AnalysisService(
-    repository=mock_repository,
-    evaluator=mock_evaluator,
-)
-```
+A service class receives every collaborator (repositories, other services, external clients) through its constructor. The constructor stores them as private fields. No service creates its own dependencies internally. This makes the dependency graph explicit and enables test doubles to be injected without patching or monkey-patching.
 
 ---
 
 ## P11 · Config Isolation
 
-Centralized, environment-based configuration with startup validation:
+Centralized, environment-based configuration with startup validation.
 
-```python
-@dataclass
-class Config:
-    database_url: str
-    debug: bool = False
-    max_workers: int = 4
-
-    @classmethod
-    def from_env(cls) -> "Config":
-        return cls(
-            database_url=os.environ["DATABASE_URL"],
-            debug=os.environ.get("DEBUG", "0") == "1",
-            max_workers=int(os.environ.get("MAX_WORKERS", "4")),
-        )
-```
+Define a configuration class with typed fields and default values. A class method reads all values from environment variables at startup, parsing them into the correct types. If a required variable is missing, startup fails immediately with a clear error. No other code reads environment variables directly — all access goes through the configuration instance.
 
 **Key rules:**
 - All config read from environment at startup
-- No scattered `os.environ` calls inside business logic
+- No scattered environment variable calls inside business logic
 - Test config overrides controlled via fixtures
 
 ---

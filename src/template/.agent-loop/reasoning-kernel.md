@@ -312,20 +312,39 @@ LEARN:
 
 ### 7. REPORT (Session Log)
 
-After completing a non-trivial task, persist a session summary to `docs/reports/`.
+The REPORT stage produces exactly one of three outcomes: a **report**, a **backlog task**, or **nothing**.
+Apply the decision tree below — follow it top to bottom, take the first matching branch.
 
-**When to write a report:**
+#### Decision Tree: Report vs Backlog vs Skip
 
-| Condition | Report Required | Format |
-|-----------|----------------|--------|
-| Multi-file refactoring | Yes | Full report |
-| New feature / module added | Yes | Full report |
-| Bug fix with root cause analysis | Yes | Abbreviated (scope + fix + verification) |
-| Architecture or pattern change | Yes | Full report + patterns.md update |
-| Single-file cosmetic fix | No | — |
-| Documentation-only update | No | — |
+```
+Was work implemented and committed this session?
+│
+├─ YES → Did the work touch multiple files or change architecture/patterns?
+│         │
+│         ├─ YES → Write REPORT to docs/reports/
+│         │        (multi-file refactor, new feature, root-cause fix,
+│         │         architecture change, pattern change)
+│         │
+│         └─ NO  → SKIP (single-file edit, cosmetic fix, docs-only update)
+│
+└─ NO  → Was an investigation or plan produced without implementation?
+          │
+          ├─ YES → Write BACKLOG TASK to docs/backlog/
+          │        (needs approval, complex decomposition required,
+          │         lower priority than current sprint, blocked on dependency)
+          │
+          └─ NO  → SKIP (question answered, context gathered, trivial lookup)
+```
 
-**Report structure:**
+**Key distinction:** Reports document **completed work**. Backlog tasks document **planned but unexecuted work**.
+Never create both for the same task. If you implemented the work, write a report. If you only planned it, write a backlog task.
+
+#### Report: Completed Work
+
+**Trigger:** Implementation was done this session AND touched ≥2 files or changed architecture/patterns.
+
+**Structure:**
 
 ```markdown
 # {Short Description}
@@ -355,10 +374,44 @@ After completing a non-trivial task, persist a session summary to `docs/reports/
 {What was persisted to patterns.md / patterns/ specs / glossary}
 ```
 
-**File placement:**
-- Report: `docs/reports/YYYY-MM-DD-{short-description}.md`
-- Supporting artifacts: `docs/reports/artifacts/`
+**File:** `docs/reports/YYYY-MM-DD-{slug}.md`
+**Artifacts:** `docs/reports/artifacts/`
+
+#### Backlog Task: Planned but Deferred Work
+
+**Trigger:** Investigation or planning was done this session BUT implementation was NOT executed.
+Reasons to defer: needs approval, requires decomposition, lower priority, blocked on external dependency.
+
+**Structure:**
+
+```markdown
+# {Task Title}
+
+**Date:** YYYY-MM-DD
+**Priority:** P0–P3
+**State:** planned
+
+## Context
+{Why this task exists — what was investigated, what triggered it}
+
+## Action Plan
+{Step-by-step implementation plan with file paths and scope}
+
+## Acceptance Criteria
+{Concrete conditions that define "done" — gate results, test coverage, behavior}
+
+## Dependencies
+{What must be resolved before this can start — other tasks, approvals, external}
+```
+
+**File:** `docs/backlog/YYYY-MM-DD-{slug}.md`
+**Index:** After creating the task file, add a row to `docs/backlog/index.md` with task number, title, priority (P0–P3), state (`planned`), date, and filename.
+
+#### Common Rules
+
 - Naming: date-prefixed, lowercase-kebab-case, no `_v1`/`_new` suffixes
+- Never create both a report and a backlog task for the same piece of work
+- If a backlog task is later implemented, mark it `done` in the index and write a report for the implementation session
 
 ---
 
@@ -460,7 +513,7 @@ LEARN
 [one-line do-more/do-less heuristic]
 
 REPORT (if non-trivial)
-[docs/reports/YYYY-MM-DD-{slug}.md created — or "skipped (trivial)"]
+[docs/reports/YYYY-MM-DD-{slug}.md | docs/backlog/YYYY-MM-DD-{slug}.md — or "skipped (trivial)"]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 

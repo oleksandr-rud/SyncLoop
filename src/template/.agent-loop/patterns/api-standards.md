@@ -19,76 +19,27 @@ Referenced from [../patterns.md](../patterns.md).
 
 ## Workflow for New Routes
 
-```
-1. Define Request/Response models in the module's models file
-2. Implement the route handler using those models
-3. Register the router in the app entrypoint with appropriate tags
-4. Run spec generation script
+1. Define Request and Response **typed models** in the module's models file — every field has a declared type and sensible defaults for optional fields
+2. Implement the route handler: parse input into the request model, resolve the service via dependency injection, call the service, and return the response model
+3. Register the router in the app entrypoint with appropriate semantic tags
+4. Run the spec generation script (OpenAPI, Swagger, or equivalent)
 5. Verify generated docs match expectations
-```
 
-### Example Route
+### Route Handler Structure
 
-```python
-# models.py — typed boundary contracts
-@dataclass
-class CreateEntityRequest:
-    name: str
-    entity_type: str
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-@dataclass
-class EntityResponse:
-    id: str
-    name: str
-    entity_type: str
-    status: str
-    created_at: str
-
-# routes.py — thin transport layer
-@router.post("/entities", response_model=EntityResponse)
-def create_entity(
-    data: CreateEntityRequest,
-    service: EntityService = Depends(get_service),
-) -> EntityResponse:
-    """Create a new entity for processing.
-
-    Validates input, delegates to service, returns created entity.
-    """
-    result = service.create(data)
-    return EntityResponse(
-        id=result.id,
-        name=result.name,
-        entity_type=result.entity_type,
-        status=result.status,
-        created_at=result.created_at.isoformat(),
-    )
-```
+A route handler is a thin transport function. It declares the HTTP method and path, accepts a typed request model as input, resolves the service through the framework's dependency injection mechanism, delegates the business operation to the service, and returns a typed response model. The handler contains no business logic, conditionals, or data transformations beyond serialization.
 
 ---
 
 ## Error Envelope
 
-All error responses must follow a consistent structure:
+All error responses must follow a consistent structure with three fields:
 
-```python
-# Standard error response
-@dataclass
-class ErrorResponse:
-    error: str          # Machine-readable error code
-    message: str        # Human-readable description
-    details: dict = field(default_factory=dict)  # Optional context
+- **error**: a machine-readable error code (string)
+- **message**: a human-readable description (string)
+- **details**: optional context dictionary for debugging
 
-# Usage at route boundary
-@router.get("/entities/{entity_id}")
-def get_entity(entity_id: str, service = Depends(get_service)):
-    try:
-        return service.get(entity_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-```
+At the route boundary, catch domain-specific exceptions (NotFoundError, ValidationError) and translate them to the appropriate HTTP status code plus an error envelope. Let unexpected exceptions propagate to a global handler that returns a generic 500-level response.
 
 ---
 

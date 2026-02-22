@@ -53,51 +53,15 @@ When modifying any of these, check all neighbors in the coupling path.
 
 ### Shapes
 
-The **signature contract** of a function, method, or class:
-
-```python
-# Shape = name + parameters + return type + raises
-def query(
-    self,
-    collection: str,
-    query_text: str,
-    *,
-    filters: dict | None = None,
-    limit: int = 10,
-) -> list[Result]:
-    ...
-```
-
-A shape change is anything that alters the call contract:
-adding/removing parameters, changing types, or modifying return types.
+The **signature contract** of a function, method, or class: its name, parameter names and types (including keyword-only and optional parameters), return type, and declared exceptions. A shape change is anything that alters the call contract: adding or removing parameters, changing parameter or return types, or modifying exception declarations.
 
 ### Boundaries
 
-The **module interface** — what is exported/public:
-
-```python
-# module/__init__.py
-from .service import MyService        # Public boundary
-from .routes import router            # Public boundary
-
-# Private (not exported) — can change freely
-# from .internal import _helper
-```
-
-Boundary changes affect every consumer that imports from the module.
+The **module interface** — the set of symbols explicitly exported as public. Public exports are the symbols listed in the module's index file or namespace declaration. Everything not exported is private and can change freely. Boundary changes affect every consumer that imports from the module.
 
 ### Bridges
 
-The **contracts between modules** — how they communicate:
-
-```python
-# Bridge: module_a → module_b
-# Contract: ServiceA.process() returns list[Result]
-# Consumer: ServiceB expects this shape
-
-# If ServiceA.process() changes return type:
-# → ServiceB breaks (bridge violation)
-```
+The **contracts between modules** — how one module's output becomes another module's input. A bridge connects a producer (the function or service returning data) to a consumer (the function or service expecting that data). If the producer changes the shape of its output, the consumer breaks unless it is also updated.
 
 ---
 
