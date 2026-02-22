@@ -2,7 +2,7 @@
   "name": "@oleksandr.rudnychenko/sync_loop",
   "version": "0.3.2",
   "type": "module",
-  "description": "MCP server for the SyncLoop agent reasoning protocol - works with Copilot, Cursor, Claude Code",
+  "description": "Self-correcting 7-stage agent reasoning loop (SENSE→GKP→DECIDE+ACT→CHALLENGE-TEST→UPDATE→LEARN→REPORT). MCP server + CLI that scaffolds instruction files for GitHub Copilot, Cursor, and Claude Code.",
   "bin": {
     "sync_loop": "./bin/cli.js"
   },
@@ -30,15 +30,27 @@
   },
   "keywords": [
     "mcp",
+    "mcp-server",
+    "model-context-protocol",
     "ai",
+    "ai-agent",
     "agent",
+    "agentic",
     "copilot",
+    "github-copilot",
     "cursor",
     "claude",
+    "claude-code",
+    "llm",
     "prompt-engineering",
     "coding-agent",
     "reasoning-loop",
-    "sync_loop"
+    "self-correcting",
+    "scaffolding",
+    "instructions",
+    "sync_loop",
+    "syncloop",
+    "devtools"
   ],
   "license": "MIT",
   "author": "oleksandr.rudnychenko",
