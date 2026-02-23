@@ -1,0 +1,17 @@
+# SyncLoop agent roles for Codex CLI
+# See: https://developers.openai.com/codex/multi-agent
+
+[agents]
+max_threads = 3
+
+[agents.default]
+description = "SyncLoop general-purpose agent. Runs the full 7-stage protocol: SENSE → GKP → DECIDE+ACT → CHALLENGE-TEST → UPDATE → LEARN → REPORT."
+config_file = "agents/default.toml"
+
+[agents.architect]
+description = "SyncLoop planning agent. Runs SENSE → GKP → DECIDE+ACT only. Use for system design, complex refactoring plans, and architecture decisions. Does NOT implement code."
+config_file = "agents/architect.toml"
+
+[agents.fixer]
+description = "SyncLoop implementation agent. Runs CHALLENGE-TEST → UPDATE → LEARN. Use for executing Action Plans, fixing bugs, and running validation gates."
+config_file = "agents/fixer.toml"

@@ -1,6 +1,6 @@
 {
   "name": "@oleksandr.rudnychenko/sync_loop",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "type": "module",
   "description": "Self-correcting 7-stage agent reasoning loop (SENSE→GKP→DECIDE+ACT→CHALLENGE-TEST→UPDATE→LEARN→REPORT). MCP server + CLI that scaffolds instruction files for GitHub Copilot, Cursor, and Claude Code.",
   "bin": {

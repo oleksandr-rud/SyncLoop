@@ -45,4 +45,4 @@ Thumbs.db
 !.vscode/launch.json
 !.vscode/mcp.json
 
-.package-lock.json
+package-lock.json

@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
 import { pathToFileURL } from "node:url";
-import { detectStacks, init, type InitTarget, type StackDefinition } from "../src/init.js";
+import { detectStacks, init, parseTarget, ALL_PLATFORMS, type InitTarget, type Platform, type StackDefinition } from "../src/init.js";
 import { startServer } from "../src/server.js";
-
-const VALID_TARGETS: InitTarget[] = ["copilot", "cursor", "claude", "all"];
 
 const HELP_TEXT = `
 sync_loop - MCP server + CLI for the SyncLoop agent reasoning protocol
@@ -20,10 +18,13 @@ Usage:
     Show this help
 
 Init targets:
-  copilot   .agent-loop/ + .github/instructions/ + copilot-instructions.md
-  cursor    .agent-loop/ + .cursor/rules/ with frontmatter
-  claude    .agent-loop/ + CLAUDE.md + .claude/rules/
+  copilot   .agent-loop/ + .github/instructions/ + agents + skills
+  cursor    .agent-loop/ + .cursor/rules/ + skills
+  claude    .agent-loop/ + CLAUDE.md + .claude/rules/ + agents + skills
+  codex     .agent-loop/ + CODEX.md + .codex/agents/ + skills
   all       All of the above (default)
+
+  Multiple targets: --target copilot,codex
 
 Flags:
   --dry-run       Preview writes without modifying files
@@ -118,12 +119,15 @@ export async function runCli(
   }
 
   if (command === "init") {
-    const target = (getOptionValue(args, "--target") ?? "all") as InitTarget;
+    const targetArg = getOptionValue(args, "--target") ?? "all";
+    const target = parseTarget(targetArg);
     const dryRun = args.includes("--dry-run");
     const overwrite = args.includes("--no-overwrite") ? false : true;
 
-    if (!VALID_TARGETS.includes(target)) {
-      io.stderr.write(`Error: unknown target "${target}". Use one of: ${VALID_TARGETS.join(", ")}\n`);
+    const platformsToValidate: string[] = Array.isArray(target) ? target : (target === "all" ? [] : [target]);
+    const invalidTarget = platformsToValidate.find((t) => !(ALL_PLATFORMS as readonly string[]).includes(t));
+    if (invalidTarget) {
+      io.stderr.write(`Error: unknown target "${invalidTarget}". Use one of: ${[...ALL_PLATFORMS, "all"].join(", ")}\n`);
       return 1;
     }
 
@@ -139,8 +143,9 @@ export async function runCli(
         { dryRun, overwrite },
       );
 
+      const targetDisplay = Array.isArray(target) ? target.join(", ") : target;
       io.stdout.write([
-        `SyncLoop initialized for ${target}:`,
+        `SyncLoop initialized for ${targetDisplay}:`,
         "",
         ...result.results,
         "",

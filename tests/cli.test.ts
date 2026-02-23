@@ -102,3 +102,26 @@ test("runCli starts MCP server in default mode", async () => {
   assert.equal(code, 0);
   assert.equal(calls.startServer, 1);
 });
+
+test("runCli supports comma-separated targets", async () => {
+  const { io, output } = createIo();
+  const { deps, calls } = createDeps();
+
+  const code = await runCli(["init", "--target", "copilot,codex"], io, deps);
+
+  assert.equal(code, 0);
+  assert.ok(Array.isArray(calls.initArgs));
+  assert.deepEqual(calls.initArgs[1], ["copilot", "codex"]);
+  assert.match(output.stdout, /SyncLoop initialized for copilot, codex/);
+});
+
+test("runCli accepts codex as target", async () => {
+  const { io, output } = createIo();
+  const { deps, calls } = createDeps();
+
+  const code = await runCli(["init", "--target", "codex"], io, deps);
+
+  assert.equal(code, 0);
+  assert.equal(calls.initArgs[1], "codex");
+  assert.match(output.stdout, /SyncLoop initialized for codex/);
+});

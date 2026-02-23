@@ -4,7 +4,7 @@ import { z } from "zod";
 import { existsSync, readFileSync } from "node:fs";
 import { join, dirname, resolve, posix } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { init, detectStacks, type InitTarget, type StackDefinition } from "./init.js";
+import { init, detectStacks, parseTarget, ALL_PLATFORMS, type InitTarget, type Platform, type StackDefinition } from "./init.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = join(__dirname, "template");
@@ -217,20 +217,22 @@ export function createServer(): McpServer {
       description: "Scaffold SyncLoop protocol files into a project. If target is not explicitly provided, default to all. If stacks are not provided, auto-detect them by scanning the repository.",
       inputSchema: {
         projectPath: z.string().optional().describe("Project root path. Defaults to current working directory."),
-        target: z.enum(["copilot", "cursor", "claude", "all"]).optional().default("all"),
+        target: z.string().optional().default("all").describe("Target platform(s): copilot, cursor, claude, codex, all. Comma-separated for multiple (e.g., 'copilot,codex')."),
         stacks: z.array(StackSchema).optional().describe("Optional stack definitions. Auto-detected when omitted."),
         dryRun: z.boolean().optional().default(false).describe("Preview file writes without modifying files."),
         overwrite: z.boolean().optional().default(true).describe("Overwrite existing generated files."),
       },
     },
-    async ({ projectPath, target = "all", stacks, dryRun = false, overwrite = true }: {
+    async ({ projectPath, target: targetRaw = "all", stacks, dryRun = false, overwrite = true }: {
       projectPath?: string;
-      target?: InitTarget;
+      target?: string;
       stacks?: StackDefinition[];
       dryRun?: boolean;
       overwrite?: boolean;
     }) => {
       try {
+        const target = parseTarget(targetRaw);
+        const targetDisplay = Array.isArray(target) ? target.join(", ") : target;
         const resolvedProjectPath = resolve(projectPath ?? process.cwd());
         const effectiveStacks = stacks?.length ? stacks : detectStacks(resolvedProjectPath);
         const initResult = init(
@@ -244,7 +246,7 @@ export function createServer(): McpServer {
 
         return {
           content: [
-            { type: "text", text: `SyncLoop initialized for ${target}:\n\n${initResult.results.join("\n")}` },
+            { type: "text", text: `SyncLoop initialized for ${targetDisplay}:\n\n${initResult.results.join("\n")}` },
             { type: "text", text: `\n---\n\n## Options\n- dryRun: ${dryRun}\n- overwrite: ${overwrite}` },
             { type: "text", text: `\n---\n\n## Detected stacks\n${stackSummary}` },
             {

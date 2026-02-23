@@ -17,7 +17,7 @@ Referenced from [reasoning-kernel.md](reasoning-kernel.md).
 ## Architecture Baseline
 
 ```
-CLI Transport (bin/) ─┬► Init Logic (src/init.ts) ► Templates (template/)
+CLI Transport (bin/) ─┬► Init Logic (src/init.ts) ► Templates (src/template/)
 MCP Transport (src/) ─┘
 ```
 
@@ -25,7 +25,7 @@ MCP Transport (src/) ─┘
 - **`bin/cli.ts`**: Argument parsing and output formatting only. Delegates all scaffolding to `src/init.ts`.
 - **`src/server.ts`**: MCP resource/tool/prompt registration only. Delegates all scaffolding to `src/init.ts`.
 - **`src/init.ts`**: All core logic — stack detection, link rewriting, placeholder substitution, file generation. No transport concerns.
-- **`template/`**: Read-only static assets. Never import from `src/`.
+- **`src/template/`**: Read-only static assets. Never import from `src/`.
 
 ### Non-Bypass Rules
 - Never implement scaffolding logic in `bin/cli.ts` or `src/server.ts` — delegate to `src/init.ts`
@@ -158,8 +158,8 @@ Documentation and contract requirements for boundary endpoints: typed models, do
 | CLI entry point | `bin/cli.js` |
 | MCP server | `src/server.js` |
 | Core scaffolding logic | `src/init.ts` |
-| Protocol template files | `template/.agent-loop/` |
-| Agent bootstrap templates | `template/AGENTS.md`, `template/protocol-summary.md`, `template/bootstrap-prompt.md` |
+| Protocol template files | `src/template/.agent-loop/` |
+| Agent bootstrap templates | `src/template/AGENTS.md`, `src/template/protocol-summary.md`, `src/template/bootstrap-prompt.md` |
 
 ### Tests
 
@@ -201,7 +201,7 @@ Documentation and contract requirements for boundary endpoints: typed models, do
 | Missing explicit return type | Signature drift | Add concrete return annotation | ✅ |
 | Stray debug artifact | Temporary local instrumentation left in patch | Remove or replace with standard logging | ✅ |
 | Caller mismatch after rename | Incomplete refactor propagation | Update all known call sites before merge | ⚠️ |
-| Stale package/binary name in docs or templates | Rename applied to code but not docs | Grep all references (`bin/`, `src/`, `template/`, `README.md`, `AGENTS.md`) and update atomically | ⚠️ |
+| Stale package/binary name in docs or templates | Rename applied to code but not docs | Grep all references (`bin/`, `src/`, `src/template/`, `README.md`, `AGENTS.md`) and update atomically | ⚠️ |
 
 ### Common Errors
 
@@ -210,7 +210,7 @@ Documentation and contract requirements for boundary endpoints: typed models, do
 | Gate keeps failing with small patch changes | Symptoms fixed, not root cause | Patch the first cause in dependency chain |
 | Neighbor break after "safe" refactor | Consumer map incomplete | Run validate-n immediately after structural edits |
 | Quality regressions in fast fixes | No targeted test sequence | Start with narrow tests, then expand |
-| Old package name appears in published output | Rename skipped template/ or README | Always grep template/ when renaming package or binary |
+| Old package name appears in published output | Rename skipped src/template/ or README | Always grep src/template/ when renaming package or binary |
 
 ### Heuristics
 
@@ -219,7 +219,7 @@ Documentation and contract requirements for boundary endpoints: typed models, do
 | Compress context into explicit constraints | Carry large raw snippets forward |
 | Validate boundaries early | Delay compatibility checks |
 | Keep patches reversible | Mix refactor and feature changes together |
-| Grep all surfaces (src, bin, template, docs) before publishing a rename | Assume code-only rename is complete |
+| Grep all surfaces (src, bin, src/template, docs) before publishing a rename | Assume code-only rename is complete |
 
 ### Pruning Records
 

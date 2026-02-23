@@ -12,7 +12,9 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = join(__dirname, "template");
 
-export type InitTarget = "copilot" | "cursor" | "claude" | "all";
+export type Platform = "copilot" | "cursor" | "claude" | "codex";
+export type InitTarget = Platform | Platform[] | "all";
+export const ALL_PLATFORMS: readonly Platform[] = ["copilot", "cursor", "claude", "codex"];
 
 export interface StackDefinition {
   name: string;
@@ -336,10 +338,13 @@ const CLAUDE: PlatformConfig = {
   "api-standards": { target: ".claude/rules/api-standards.md", fm: { paths: ["**/routes/**", "**/api/**", "**/controllers/**"] } },
 };
 
-const PLATFORM_CONFIGS: Record<Exclude<InitTarget, "all">, PlatformConfig> = {
+const CODEX: PlatformConfig = {};
+
+const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
   copilot: COPILOT,
   cursor: CURSOR,
   claude: CLAUDE,
+  codex: CODEX,
 };
 
 // ---------------------------------------------------------------------------
@@ -387,7 +392,7 @@ function applyStacks(content: string, stacks: StackDefinition[]): string {
 
 function generatePlatformFiles(
   projectPath: string,
-  platform: Exclude<InitTarget, "all">,
+  platform: Platform,
   stacks: StackDefinition[],
   options: InitOptions,
 ): string[] {
@@ -432,6 +437,10 @@ function generatePlatformFiles(
     const frontmatter = yamlFrontmatter({ description: "SyncLoop protocol summary and guardrails", alwaysApply: true });
     const writeResult = writeOutput(projectPath, ".cursor/rules/00-protocol.md", `${frontmatter}\n\n${summary}`, options);
     results.push(`  ${formatWriteResult(writeResult)}`);
+
+    const diagnoseFailureBody = applyStacks(readTemplate("wiring/skills-diagnose-failure.md"), stacks);
+    const diagnoseFailureResult = writeOutput(projectPath, ".cursor/skills/diagnose-failure/SKILL.md", diagnoseFailureBody, options);
+    results.push(`  ${formatWriteResult(diagnoseFailureResult)}`);
   } else if (platform === "claude") {
     const writeResult = writeOutput(projectPath, "CLAUDE.md", summary, options);
     results.push(`  ${formatWriteResult(writeResult)}`);
@@ -451,6 +460,29 @@ function generatePlatformFiles(
     const diagnoseFailureBody = applyStacks(readTemplate("wiring/skills-diagnose-failure.md"), stacks);
     const diagnoseFailureResult = writeOutput(projectPath, ".claude/skills/diagnose-failure/SKILL.md", diagnoseFailureBody, options);
     results.push(`  ${formatWriteResult(diagnoseFailureResult)}`);
+  } else if (platform === "codex") {
+    const writeResult = writeOutput(projectPath, "CODEX.md", summary, options);
+    results.push(`  ${formatWriteResult(writeResult)}`);
+
+    const diagnoseFailureBody = applyStacks(readTemplate("wiring/skills-diagnose-failure.md"), stacks);
+    const diagnoseFailureResult = writeOutput(projectPath, ".agents/skills/diagnose-failure/SKILL.md", diagnoseFailureBody, options);
+    results.push(`  ${formatWriteResult(diagnoseFailureResult)}`);
+
+    const codexConfig = readTemplate("wiring/codex-config.toml");
+    const configResult = writeOutput(projectPath, ".codex/config.toml", codexConfig, options);
+    results.push(`  ${formatWriteResult(configResult)}`);
+
+    const defaultAgent = readTemplate("wiring/codex-agent-default.toml");
+    const defaultResult = writeOutput(projectPath, ".codex/agents/default.toml", defaultAgent, options);
+    results.push(`  ${formatWriteResult(defaultResult)}`);
+
+    const architectAgent = readTemplate("wiring/codex-agent-architect.toml");
+    const architectResult = writeOutput(projectPath, ".codex/agents/architect.toml", architectAgent, options);
+    results.push(`  ${formatWriteResult(architectResult)}`);
+
+    const fixerAgent = readTemplate("wiring/codex-agent-fixer.toml");
+    const fixerResult = writeOutput(projectPath, ".codex/agents/fixer.toml", fixerAgent, options);
+    results.push(`  ${formatWriteResult(fixerResult)}`);
   }
 
   return results;
@@ -459,6 +491,13 @@ function generatePlatformFiles(
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+export function parseTarget(value: string): InitTarget {
+  if (value === "all") return "all";
+  const parts = [...new Set(value.split(",").map((t) => t.trim()).filter(Boolean))];
+  if (parts.length === 1) return parts[0] as Platform;
+  return parts as Platform[];
+}
 
 export function init(
   projectPath: string,
@@ -480,9 +519,15 @@ export function init(
     overwrite: options.overwrite ?? true,
   };
 
-  const validTargets: InitTarget[] = ["copilot", "cursor", "claude", "all"];
-  if (!validTargets.includes(target)) {
-    throw new Error(`Unknown target "${target}". Use one of: ${validTargets.join(", ")}`);
+  if (typeof target === "string" && target !== "all" && !(ALL_PLATFORMS as readonly string[]).includes(target)) {
+    throw new Error(`Unknown target "${target}". Use one of: ${[...ALL_PLATFORMS, "all"].join(", ")}`);
+  }
+  if (Array.isArray(target)) {
+    for (const t of target) {
+      if (!(ALL_PLATFORMS as readonly string[]).includes(t)) {
+        throw new Error(`Unknown target "${t}". Use one of: ${[...ALL_PLATFORMS, "all"].join(", ")}`);
+      }
+    }
   }
 
   const results: string[] = [];
@@ -522,9 +567,11 @@ export function init(
   const backlogResult = writeOutput(root, "docs/backlog/index.md", backlogContent, { ...mergedOptions, overwrite: false });
   results.push(`docs/backlog/index.md (${formatWriteResult(backlogResult)})`);
 
-  const targets: Exclude<InitTarget, "all">[] = target === "all"
-    ? ["copilot", "cursor", "claude"]
-    : [target];
+  const targets: Platform[] = target === "all"
+    ? [...ALL_PLATFORMS]
+    : Array.isArray(target)
+      ? target
+      : [target];
 
   for (const currentTarget of targets) {
     results.push(`\n[${currentTarget}]`);

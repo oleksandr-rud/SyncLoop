@@ -4,7 +4,7 @@
 
 AI coding agents hallucinate fixes, ignore your architecture, lose context in long sessions, and repeat the same mistakes. SyncLoop wires a 7-stage self-correcting loop into your agent via MCP — sense → plan → act → validate → learn — every turn, automatically.
 
-Works with **GitHub Copilot**, **Cursor**, and **Claude Code**.
+Works with **GitHub Copilot**, **Cursor**, **Claude Code**, and **Codex**.
 
 ---
 
@@ -56,7 +56,7 @@ Run the `bootstrap` prompt so the agent scans your codebase and populates protoc
 Use the `init` tool to write protocol files directly into your repo:
 
 ```
-Use the sync_loop init tool — choose: copilot, cursor, claude, or all
+Use the sync_loop init tool — choose: copilot, cursor, claude, codex, or all. Comma-separated for multiple: copilot,codex
 ```
 
 This generates agent definitions, instruction files, and a canonical `.agent-loop/` folder with the full protocol. Useful for CI, offline work, or customization.
@@ -114,16 +114,17 @@ SENSE → GKP → DECIDE+ACT → CHALLENGE-TEST → UPDATE → LEARN → REPORT
 | Target | Files generated |
 |--------|----------------|
 | `copilot` | `.agent-loop/` + `.github/copilot-instructions.md` + `.github/instructions/*.instructions.md` + `.github/agents/SyncLoop*.agent.md` + `.github/skills/diagnose-failure/SKILL.md` |
-| `cursor` | `.agent-loop/` + `.cursor/rules/*.md` |
+| `cursor` | `.agent-loop/` + `.cursor/rules/*.md` + `.cursor/skills/diagnose-failure/SKILL.md` |
 | `claude` | `.agent-loop/` + `CLAUDE.md` + `.claude/rules/*.md` + `.claude/agents/SyncLoop*.md` + `.claude/skills/diagnose-failure/SKILL.md` |
+| `codex` | `.agent-loop/` + `CODEX.md` + `.codex/config.toml` + `.codex/agents/*.toml` + `.agents/skills/diagnose-failure/SKILL.md` |
 | `all` | All of the above + `AGENTS.md` + `docs/backlog/index.md` |
 
-**Agents scaffolded** (Copilot + Claude):
+**Agents scaffolded** (Copilot + Claude + Codex):
 - **SyncLoop** — Full 7-stage protocol agent
 - **SyncLoop-Architect** — Read-only planning agent (SENSE → GKP → DECIDE+ACT only)
 - **SyncLoop-Fixer** — Implementation agent (CHALLENGE-TEST → UPDATE → LEARN)
 
-**Skills scaffolded:**
+**Skills scaffolded** (all platforms):
 - **diagnose-failure** — Failure diagnosis using the FEEDBACK loop
 
 ---
