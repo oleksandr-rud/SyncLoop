@@ -2,9 +2,12 @@
 
 **Stop your AI agent from guessing. Give it a reasoning loop.**
 
-AI coding agents hallucinate fixes, ignore your architecture, lose context in long sessions, and repeat the same mistakes. SyncLoop wires a 7-stage self-correcting loop into your agent via MCP — sense → plan → act → validate → learn — every turn, automatically.
+SyncLoop is an MCP server that gives your AI coding agent a structured reasoning loop — so it reads before it writes, validates before it commits, and learns from its own mistakes.
 
-Works with **GitHub Copilot**, **Cursor**, **Claude Code**, and **Codex**.
+[![npm](https://img.shields.io/npm/v/%40oleksandr.rudnychenko%2Fsync_loop?label=npm)](https://www.npmjs.com/package/@oleksandr.rudnychenko/sync_loop)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![MCP Compatible](https://img.shields.io/badge/MCP-compatible-brightgreen)](https://modelcontextprotocol.io)
+[![Node.js >=18](https://img.shields.io/badge/node-%3E%3D18-green)](https://nodejs.org)
 
 ---
 
@@ -18,6 +21,30 @@ Works with **GitHub Copilot**, **Cursor**, **Claude Code**, and **Codex**.
 | Agent repeats failed approaches | Failed approaches pruned and recorded as hard constraints |
 | Tests modified to pass | Agent is hardcoded to fix source code, never tests |
 | No record of what the agent did or why | Structured reports and backlog tasks generated automatically |
+
+---
+
+## Use Cases
+
+### "Fix this bug without breaking anything else"
+
+The agent reads the codebase first (SENSE), pulls only the relevant constraints (GKP), patches the root cause (DECIDE+ACT), then runs type checks + test gates + neighbor checks in a loop until everything passes (CHALLENGE-TEST). If the same fix fails 3 times, it's pruned and the agent tries a different approach.
+
+### "Refactor this module safely"
+
+Pattern R1 kicks in: the agent plans the moves, executes them, validates all imports and cross-module contracts, and documents what changed. It won't mix refactoring with feature changes in the same patch.
+
+### "Add an API endpoint"
+
+Patterns R3 (API contracts) and P5 (transport routes) route the agent to use typed request/response models, proper error envelopes, and enforce that no business logic leaks into the route handler.
+
+### "This session is getting long and the agent is getting confused"
+
+SyncLoop compresses context after each successful cycle (State Collapse) and discards raw history. Only a compact checkpoint enters the next turn. The agent stays sharp instead of degrading.
+
+### "I want to plan work but not implement it yet"
+
+The REPORT stage routes investigations to `docs/backlog/` as structured task files with priority, Action Plan, and acceptance criteria — separate from completed-work reports in `docs/reports/`.
 
 ---
 
@@ -63,37 +90,18 @@ This generates agent definitions, instruction files, and a canonical `.agent-loo
 
 ---
 
-## Use Cases
+## How It Works
 
-### "Fix this bug without breaking anything else"
-
-The agent reads the codebase first (SENSE), pulls only the relevant constraints (GKP), patches the root cause (DECIDE+ACT), then runs type checks + test gates + neighbor checks in a loop until everything passes (CHALLENGE-TEST). If the same fix fails 3 times, it's pruned and the agent tries a different approach.
-
-### "Refactor this module safely"
-
-Pattern R1 kicks in: the agent plans the moves, executes them, validates all imports and cross-module contracts, and documents what changed. It won't mix refactoring with feature changes in the same patch.
-
-### "Add an API endpoint"
-
-Patterns R3 (API contracts) and P5 (transport routes) route the agent to use typed request/response models, proper error envelopes, and enforce that no business logic leaks into the route handler.
-
-### "This session is getting long and the agent is getting confused"
-
-SyncLoop compresses context after each successful cycle (State Collapse) and discards raw history. Only a compact checkpoint enters the next turn. The agent stays sharp instead of degrading.
-
-### "I want to plan work but not implement it yet"
-
-The REPORT stage routes investigations to `docs/backlog/` as structured task files with priority, Action Plan, and acceptance criteria — separate from completed-work reports in `docs/reports/`.
-
----
-
-## The 7-Stage Loop
-
-Every turn follows this sequence — no shortcuts, no skipped stages:
+Every time your agent takes a turn, SyncLoop runs it through a loop: read the code first, plan against your architecture rules, make the change, then validate it passes types/tests/boundary checks. If validation fails, the agent patches and retries (up to 5×). Failed approaches are pruned so the agent never repeats the same mistake.
 
 ```
 SENSE → GKP → DECIDE+ACT → CHALLENGE-TEST → UPDATE → LEARN → REPORT
 ```
+
+<details>
+<summary>Full 7-Stage Loop</summary>
+
+Every turn follows this sequence — no shortcuts, no skipped stages:
 
 | Stage | What the agent does |
 |-------|---------------------|
@@ -107,9 +115,12 @@ SENSE → GKP → DECIDE+ACT → CHALLENGE-TEST → UPDATE → LEARN → REPORT
 
 **Self-correction:** Test failures and layer violations trigger a patch → retry loop (max 5). Trivial issues (missing type, stray debug call) are fixed in-place without consuming retries. Same failure 3× → approach pruned, lesson injected, agent re-plans.
 
+</details>
+
 ---
 
-## What Gets Scaffolded
+<details>
+<summary>What Gets Scaffolded</summary>
 
 | Target | Files generated |
 |--------|----------------|
@@ -127,9 +138,12 @@ SENSE → GKP → DECIDE+ACT → CHALLENGE-TEST → UPDATE → LEARN → REPORT
 **Skills scaffolded** (all platforms):
 - **diagnose-failure** — Failure diagnosis using the FEEDBACK loop
 
+</details>
+
 ---
 
-## MCP Server Reference
+<details>
+<summary>MCP Server Reference</summary>
 
 ### Resources (on-demand protocol docs)
 
@@ -162,15 +176,19 @@ SENSE → GKP → DECIDE+ACT → CHALLENGE-TEST → UPDATE → LEARN → REPORT
 | `bootstrap` | Scan your codebase and wire SyncLoop to your real architecture |
 | `protocol` | Condensed protocol for direct system-prompt injection |
 
+</details>
+
 ---
 
-## Development
+## Get Started
 
-```bash
-npm install
-npm run typecheck
-npm test
-```
+Add the MCP config above and ask your agent to run `bootstrap`. That's it.
+
+[⭐ Star this repo](https://github.com/oleksandr-rud/SyncLoop) · [📦 npm](https://www.npmjs.com/package/@oleksandr.rudnychenko/sync_loop) · [🐛 Report an issue](https://github.com/oleksandr-rud/SyncLoop/issues)
+
+## Contributing
+
+**Want to contribute?** See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
